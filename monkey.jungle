@@ -1,0 +1,4 @@
+project.manifest = manifest.xml
+
+# Relax compile-time type checking (code is written defensively at runtime)
+project.typecheck = 0

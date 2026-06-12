@@ -1,0 +1,72 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Connect IQ SDK + device files, maintained at github.com/matco/connectiq-tester
+    # (Garmin's own SDK manager needs a GUI + login, so CI uses this image).
+    # Pin to a versioned tag for reproducible builds if desired.
+    container:
+      image: ghcr.io/matco/connectiq-tester:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make device files visible to the runner user
+        run: |
+          # The image stores device definitions in /root/.Garmin; GitHub job
+          # containers override HOME, so link them into the effective HOME too.
+          if [ -n "$HOME" ] && [ "$HOME" != "/root" ]; then
+            mkdir -p "$HOME"
+            ln -sfn /root/.Garmin "$HOME/.Garmin"
+          fi
+
+      - name: Prepare developer key
+        env:
+          DEVELOPER_KEY_B64: ${{ secrets.CIQ_DEVELOPER_KEY }}
+        run: |
+          if [ -n "$DEVELOPER_KEY_B64" ]; then
+            echo "Using developer key from CIQ_DEVELOPER_KEY secret"
+            echo "$DEVELOPER_KEY_B64" | base64 -d > developer_key.der
+          else
+            echo "No CIQ_DEVELOPER_KEY secret set - generating an ephemeral key"
+            if ! command -v openssl >/dev/null 2>&1; then
+              apt-get update -qq && apt-get install -y -qq --no-install-recommends openssl
+            fi
+            openssl genrsa -out developer_key.pem 4096 2>/dev/null
+            openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
+              -in developer_key.pem -out developer_key.der
+          fi
+
+      - name: Build (venux1)
+        run: |
+          monkeyc -d venux1 -f monkey.jungle -o PoiFinder.prg \
+            -y developer_key.der -w
+
+      - name: Upload sideloadable app
+        uses: actions/upload-artifact@v4
+        with:
+          name: PoiFinder-venux1
+          path: PoiFinder.prg
+          if-no-files-found: error
+
+      # On version tags, also produce the store-upload package (.iq)
+      - name: Export store package
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          monkeyc -e -f monkey.jungle -o PoiFinder.iq -y developer_key.der -w
+
+      - name: Upload store package
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: PoiFinder-store-package
+          path: PoiFinder.iq
+          if-no-files-found: error

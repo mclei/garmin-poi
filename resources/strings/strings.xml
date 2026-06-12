@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<strings>
+    <string id="AppName">POI Finder</string>
+
+    <string id="WaitGps">Waiting for GPS...</string>
+    <string id="Loading">Loading places...</string>
+    <string id="NoPois">Nothing found yet</string>
+
+    <string id="MenuFilters">Filters</string>
+    <string id="MenuNearby">Nearby</string>
+    <string id="MenuRefresh">Refresh now</string>
+    <string id="ClearTarget">Clear target</string>
+
+    <string id="CatHistoric">Historic &amp; sights</string>
+    <string id="CatFood">Food &amp; drink</string>
+    <string id="CatCulture">Culture</string>
+    <string id="CatAircraft">Aircraft (live)</string>
+
+    <string id="SetRadius">Search radius (m)</string>
+    <string id="SetMaxPois">Max places shown</string>
+    <string id="SetAirRefresh">Aircraft refresh (s)</string>
+</strings>
