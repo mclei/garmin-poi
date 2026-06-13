@@ -1,6 +1,12 @@
 import Toybox.Lang;
 import Toybox.WatchUi;
 
+// Input mapping for the compass screen.
+//   Start/Enter button .......... Filters menu (categories + Refresh)
+//   Swipe in from right edge .... Filters menu
+//   Long-press (where supported)  Filters menu
+//   Tap / swipe up .............. Nearby POI list (select = lock target)
+//   Back ........................ exit
 class MainDelegate extends WatchUi.BehaviorDelegate {
 
     private var _model as PoiModel;
@@ -10,26 +16,34 @@ class MainDelegate extends WatchUi.BehaviorDelegate {
         _model = model;
     }
 
+    // Primary action button (Start/Enter on the Venu X1)
+    function onSelect() as Boolean {
+        PoiUi.pushFilterMenu(_model);
+        return true;
+    }
+
+    // Long-press menu behavior, on devices/firmware that emit it
     function onMenu() as Boolean {
         PoiUi.pushFilterMenu(_model);
         return true;
     }
 
-    function onSelect() as Boolean {
-        PoiUi.pushPoiList(_model);
-        return true;
+    function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
+        var dir = evt.getDirection();
+        if (dir == WatchUi.SWIPE_LEFT) {
+            // finger drags in from the right edge toward the left
+            PoiUi.pushFilterMenu(_model);
+            return true;
+        }
+        if (dir == WatchUi.SWIPE_UP) {
+            PoiUi.pushPoiList(_model);
+            return true;
+        }
+        return false;
     }
 
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
         PoiUi.pushPoiList(_model);
         return true;
-    }
-
-    function onSwipe(evt as WatchUi.SwipeEvent) as Boolean {
-        if (evt.getDirection() == WatchUi.SWIPE_UP) {
-            PoiUi.pushPoiList(_model);
-            return true;
-        }
-        return false;
     }
 }

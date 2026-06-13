@@ -113,9 +113,14 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 
 | Input | Action |
 |-------|--------|
-| Tap screen / select key / swipe up | Nearest-POI list; select = lock target |
-| Hold for menu | Category filters + "Refresh now" |
+| **Start/Enter button**, or **swipe in from the right edge** | Filters menu — category toggles + "Refresh now" |
+| Tap screen / swipe up | Nearest-POI list; select = lock target |
+| Long-press screen | Filters menu (only where the firmware emits it) |
 | Back | Exit |
+
+On a sideloaded build the phone settings are unavailable, so the **Filters
+menu is where you turn POI categories on and off** — open it with the Start
+button or a right-edge swipe.
 
 Status line at the bottom: current heading, POI count (or load/error
 state), aircraft count when the aircraft category is enabled.
