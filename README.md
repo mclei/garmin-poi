@@ -27,7 +27,7 @@ any modern Connect IQ device you add to the manifest.
 
 | Data | Source | Notes |
 |------|--------|-------|
-| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Public server, fair-use. The app fetches at most every 60 s and only after you move >400 m. |
+| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Public servers, fair-use. The app fetches at most every 60 s and only after you move >400 m. It rotates across several mirrors (`overpass-api.de`, `overpass.osm.ch`, `kumi.systems`, `private.coffee`) and retries on the next one if a request fails — the main instance intermittently returns a 406 page that can't be parsed. |
 | Aircraft | [OpenSky Network](https://opensky-network.org) | Anonymous access has a daily request budget (~400 credits/day, 1–4 per call). Default refresh is 30 s; raise it in settings if you watch planes for hours. |
 
 Requests go through the **paired phone** (Garmin Connect Mobile must be
@@ -146,7 +146,8 @@ and push — the workflow runs automatically.
 | Symptom | Cause |
 |---------|-------|
 | `POI err -104` | Watch not connected to the phone / no internet |
-| `POI err 429` / `504` | Overpass server busy — automatic retry after 30 s |
+| `POI err -400` | A mirror returned a non-JSON page (e.g. overpass-api.de's intermittent 406). The app rotates to another mirror and retries within ~8 s; transient. |
+| `POI err 429` / `504` | Overpass server busy — rotates to another mirror and retries (~8 s) |
 | `air err 429` | OpenSky anonymous daily budget exhausted |
 | `POI err -402` | Response too large — reduce radius or max places |
 | Compass frozen | Calibrate compass (figure-8 motion); Venu X1 has a magnetometer |

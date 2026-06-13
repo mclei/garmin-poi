@@ -7,7 +7,16 @@ import Toybox.Sensor;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+// Public Overpass mirrors. The main overpass-api.de instance intermittently
+// serves a 406 HTML page from one of its load-balanced backends; the watch
+// cannot parse that as JSON and reports error -400. We rotate to the next
+// mirror on any failed request so a transient failure recovers quickly.
+const OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.osm.ch/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter"
+];
 const OPENSKY_URL = "https://opensky-network.org/api/states/all";
 
 const MAX_AIRCRAFT = 25;
@@ -47,6 +56,7 @@ class PoiModel {
     private var _fetchLat as Double?;
     private var _fetchLon as Double?;
     private var _fetchedMask as Number;  // land categories included in last fetch
+    private var _opIndex as Number;      // current Overpass mirror
     private var _dirty as Boolean;
 
     function initialize() {
@@ -74,6 +84,7 @@ class PoiModel {
         _fetchLat = null;
         _fetchLon = null;
         _fetchedMask = 0;
+        _opIndex = 0;
         _dirty = true;
         reloadSettings();
     }
@@ -266,7 +277,7 @@ class PoiModel {
                                            _fetchLat as Double, _fetchLon as Double);
             if (_needPoiFetch && since >= 10) {
                 doFetch = true;
-            } else if (poiStatus == STATUS_ERROR && since >= 30) {
+            } else if (poiStatus == STATUS_ERROR && since >= 8) {
                 doFetch = true;
             } else if (moved > 400.0 && since >= 60) {
                 doFetch = true;
@@ -291,7 +302,8 @@ class PoiModel {
             :method => Communications.HTTP_REQUEST_METHOD_GET,
             :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
         };
-        Communications.makeWebRequest(OVERPASS_URL, {"data" => buildQuery()},
+        var url = OVERPASS_ENDPOINTS[_opIndex % OVERPASS_ENDPOINTS.size()];
+        Communications.makeWebRequest(url, {"data" => buildQuery()},
                                       options, method(:onPoiResponse));
     }
 
@@ -330,10 +342,14 @@ class PoiModel {
             } else {
                 poiStatus = STATUS_ERROR;
                 poiError = -1;
+                _opIndex = (_opIndex + 1) % OVERPASS_ENDPOINTS.size();
             }
         } else {
             poiStatus = STATUS_ERROR;
             poiError = code;
+            // Rotate to the next mirror; a 406/5xx/parse error on one backend
+            // usually succeeds on another.
+            _opIndex = (_opIndex + 1) % OVERPASS_ENDPOINTS.size();
         }
         WatchUi.requestUpdate();
     }
