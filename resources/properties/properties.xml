@@ -3,8 +3,16 @@
     <property id="radiusMeters" type="number">5000</property>
     <property id="maxPois" type="number">40</property>
     <property id="aircraftRefreshSec" type="number">30</property>
-    <property id="catHistoric" type="boolean">true</property>
-    <property id="catFood" type="boolean">true</property>
-    <property id="catCulture" type="boolean">true</property>
+
+    <property id="catMonument" type="boolean">true</property>
+    <property id="catCastle" type="boolean">true</property>
+    <property id="catRuins" type="boolean">true</property>
+    <property id="catViewpoint" type="boolean">true</property>
+    <property id="catRestaurant" type="boolean">true</property>
+    <property id="catCafe" type="boolean">false</property>
+    <property id="catBar" type="boolean">false</property>
+    <property id="catMuseum" type="boolean">true</property>
+    <property id="catTheatre" type="boolean">false</property>
+    <property id="catWorship" type="boolean">false</property>
     <property id="catAircraft" type="boolean">false</property>
 </properties>

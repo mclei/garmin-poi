@@ -6,18 +6,41 @@
     <setting propertyKey="@Properties.maxPois" title="@Strings.SetMaxPois">
         <settingConfig type="numeric" min="10" max="100"/>
     </setting>
-    <setting propertyKey="@Properties.catHistoric" title="@Strings.CatHistoric">
+
+    <setting propertyKey="@Properties.catMonument" title="@Strings.CatMonument">
         <settingConfig type="boolean"/>
     </setting>
-    <setting propertyKey="@Properties.catFood" title="@Strings.CatFood">
+    <setting propertyKey="@Properties.catCastle" title="@Strings.CatCastle">
         <settingConfig type="boolean"/>
     </setting>
-    <setting propertyKey="@Properties.catCulture" title="@Strings.CatCulture">
+    <setting propertyKey="@Properties.catRuins" title="@Strings.CatRuins">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catViewpoint" title="@Strings.CatViewpoint">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catRestaurant" title="@Strings.CatRestaurant">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catCafe" title="@Strings.CatCafe">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catBar" title="@Strings.CatBar">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catMuseum" title="@Strings.CatMuseum">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catTheatre" title="@Strings.CatTheatre">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catWorship" title="@Strings.CatWorship">
         <settingConfig type="boolean"/>
     </setting>
     <setting propertyKey="@Properties.catAircraft" title="@Strings.CatAircraft">
         <settingConfig type="boolean"/>
     </setting>
+
     <setting propertyKey="@Properties.aircraftRefreshSec" title="@Strings.SetAirRefresh">
         <settingConfig type="numeric" min="15" max="120"/>
     </setting>

@@ -15,12 +15,25 @@ any modern Connect IQ device you add to the manifest.
 - **Nearest list**: tap / swipe up for a distance-sorted list of everything
   nearby. Selecting an entry *locks it as target* — the arrow then keeps
   pointing at it until you clear the lock.
-- **Categories** (toggle on the watch via hold-menu, or in phone settings):
-  - Historic & sights — OSM `historic=*`, attractions, viewpoints
-  - Food & drink — restaurants, cafés, bars, pubs, fast food
-  - Culture — museums, galleries, theatres, cinemas, churches, libraries
+- **Categories** — each is an independent on/off toggle, available both on
+  the watch (hold for menu → Filters) and in the phone settings. Connect IQ
+  has no multi-select list widget, so "pick the categories you want" is done
+  with one toggle per category:
+  - Monuments & memorials — `historic=*` (the catch-all for historic features)
+  - Castles & forts — `historic=castle/fort/city_gate/palace/…`
+  - Ruins & archaeology — `historic=ruins/archaeological_site`
+  - Viewpoints & attractions — `tourism=viewpoint/attraction`
+  - Restaurants — `amenity=restaurant`
+  - Cafés & fast food — `amenity=cafe/fast_food/ice_cream`
+  - Bars & pubs — `amenity=bar/pub/biergarten`
+  - Museums & galleries — `tourism=museum/gallery/artwork`
+  - Theatres & cinemas — `amenity=theatre/cinema/arts_centre`
+  - Places of worship — `amenity=place_of_worship`
   - Aircraft (live) — overhead air traffic with callsign, altitude, speed
     and ground track
+
+  Defaults on: Monuments, Castles, Ruins, Viewpoints, Restaurants, Museums.
+  Food categories are capped at a 2 km radius regardless of the search radius.
 - Search radius configurable 0.5–10 km (default 5 km).
 
 ## Data sources (free, no API keys)

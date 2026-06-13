@@ -9,15 +9,9 @@ module PoiUi {
         var menu = new WatchUi.Menu2({
             :title => WatchUi.loadResource(Rez.Strings.MenuFilters)
         });
-        var labels = [
-            Rez.Strings.CatHistoric,
-            Rez.Strings.CatFood,
-            Rez.Strings.CatCulture,
-            Rez.Strings.CatAircraft
-        ];
         for (var c = 0; c < NUM_CATS; c++) {
             menu.addItem(new WatchUi.ToggleMenuItem(
-                WatchUi.loadResource(labels[c]) as String,
+                WatchUi.loadResource(PoiCat.label(c)) as String,
                 null, c, model.catEnabled[c], null));
         }
         menu.addItem(new WatchUi.MenuItem(

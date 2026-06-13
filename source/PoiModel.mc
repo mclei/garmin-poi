@@ -75,7 +75,10 @@ class PoiModel {
         radiusM = 5000;
         maxPois = 40;
         airRefreshSec = 30;
-        catEnabled = [true, true, true, false] as Array<Boolean>;
+        catEnabled = new Array<Boolean>[NUM_CATS];
+        for (var c = 0; c < NUM_CATS; c++) {
+            catEnabled[c] = PoiCat.defaultEnabled(c);
+        }
         _fetchPending = false;
         _airPending = false;
         _needPoiFetch = false;
@@ -110,12 +113,11 @@ class PoiModel {
         if (maxPois > 100) { maxPois = 100; }
         airRefreshSec = getNumProp("aircraftRefreshSec", 30);
         if (airRefreshSec < 15) { airRefreshSec = 15; }
-        catEnabled = [
-            getBoolProp("catHistoric", true),
-            getBoolProp("catFood", true),
-            getBoolProp("catCulture", true),
-            getBoolProp("catAircraft", false)
-        ] as Array<Boolean>;
+        var arr = new Array<Boolean>[NUM_CATS];
+        for (var c = 0; c < NUM_CATS; c++) {
+            arr[c] = getBoolProp(PoiCat.propKey(c), PoiCat.defaultEnabled(c));
+        }
+        catEnabled = arr;
         // refetch if an enabled land category was not part of the last fetch
         for (var c = 0; c < NUM_LAND_CATS; c++) {
             if (catEnabled[c] && (_fetchedMask & (1 << c)) == 0) {
@@ -297,6 +299,11 @@ class PoiModel {
         for (var c = 0; c < NUM_LAND_CATS; c++) {
             if (catEnabled[c]) { mask |= (1 << c); }
         }
+        // A broad nwr[historic] query also returns castles/ruins, so mark them
+        // covered to avoid a redundant refetch when those toggles flip on.
+        if ((mask & (1 << CAT_MONUMENT)) != 0) {
+            mask |= (1 << CAT_CASTLE) | (1 << CAT_RUINS);
+        }
         _fetchedMask = mask;
         var options = {
             :method => Communications.HTTP_REQUEST_METHOD_GET,
@@ -316,16 +323,40 @@ class PoiModel {
         var rFood = (radiusM < 2000) ? radiusM : 2000;
         var aroundFood = "(around:" + rFood.toString() + "," + la + "," + lo + ");";
         var q = "[out:json][timeout:10];(";
-        if (catEnabled[CAT_HISTORIC]) {
+        // Historic: a broad nwr[historic] covers monuments/memorials and is
+        // classified down to castles/ruins; if only the narrow toggles are on,
+        // fetch just those subsets.
+        if (catEnabled[CAT_MONUMENT]) {
             q += "nwr[historic]" + around;
+        } else {
+            if (catEnabled[CAT_CASTLE]) {
+                q += "nwr[historic~\"^(castle|fort|fortress|city_gate|citadel|castle_wall|manor|palace)$\"]" + around;
+            }
+            if (catEnabled[CAT_RUINS]) {
+                q += "nwr[historic~\"^(ruins|archaeological_site)$\"]" + around;
+            }
+        }
+        if (catEnabled[CAT_VIEWPOINT]) {
             q += "nwr[tourism~\"^(attraction|viewpoint)$\"]" + around;
         }
-        if (catEnabled[CAT_FOOD]) {
-            q += "nwr[amenity~\"^(restaurant|cafe|fast_food|bar|pub|biergarten|ice_cream)$\"]" + aroundFood;
+        // Food & drink (radius-capped): build the amenity alternation from the
+        // enabled sub-toggles.
+        var food = "";
+        if (catEnabled[CAT_RESTAURANT]) { food += "restaurant|"; }
+        if (catEnabled[CAT_CAFE]) { food += "cafe|fast_food|ice_cream|"; }
+        if (catEnabled[CAT_BAR]) { food += "bar|pub|biergarten|"; }
+        if (food.length() > 0) {
+            food = food.substring(0, food.length() - 1); // drop trailing '|'
+            q += "nwr[amenity~\"^(" + food + ")$\"]" + aroundFood;
         }
-        if (catEnabled[CAT_CULTURE]) {
+        if (catEnabled[CAT_MUSEUM]) {
             q += "nwr[tourism~\"^(museum|gallery|artwork)$\"]" + around;
-            q += "nwr[amenity~\"^(theatre|arts_centre|cinema|place_of_worship|library)$\"]" + around;
+        }
+        if (catEnabled[CAT_THEATRE]) {
+            q += "nwr[amenity~\"^(theatre|cinema|arts_centre)$\"]" + around;
+        }
+        if (catEnabled[CAT_WORSHIP]) {
+            q += "nwr[amenity=place_of_worship]" + around;
         }
         q += ");out center qt 120;";
         return q;
@@ -396,29 +427,42 @@ class PoiModel {
 
     private function categorize(tags as Dictionary) as Array? {
         var h = tags["historic"];
-        if (h instanceof String) { return [CAT_HISTORIC, h]; }
+        if (h instanceof String) {
+            if (h.equals("castle") || h.equals("fort") || h.equals("fortress")
+                || h.equals("city_gate") || h.equals("citadel")
+                || h.equals("castle_wall") || h.equals("manor")
+                || h.equals("palace")) {
+                return [CAT_CASTLE, h];
+            }
+            if (h.equals("ruins") || h.equals("archaeological_site")) {
+                return [CAT_RUINS, h];
+            }
+            return [CAT_MONUMENT, h]; // monuments, memorials, other historic
+        }
         var t = tags["tourism"];
         if (t instanceof String) {
             if (t.equals("attraction") || t.equals("viewpoint")) {
-                return [CAT_HISTORIC, t];
+                return [CAT_VIEWPOINT, t];
             }
             if (t.equals("museum") || t.equals("gallery") || t.equals("artwork")) {
-                return [CAT_CULTURE, t];
+                return [CAT_MUSEUM, t];
             }
         }
         var a = tags["amenity"];
         if (a instanceof String) {
-            if (a.equals("restaurant") || a.equals("cafe")
-                || a.equals("fast_food") || a.equals("bar")
-                || a.equals("pub") || a.equals("biergarten")
+            if (a.equals("restaurant")) { return [CAT_RESTAURANT, a]; }
+            if (a.equals("cafe") || a.equals("fast_food")
                 || a.equals("ice_cream")) {
-                return [CAT_FOOD, a];
+                return [CAT_CAFE, a];
             }
-            if (a.equals("theatre") || a.equals("arts_centre")
-                || a.equals("cinema") || a.equals("place_of_worship")
-                || a.equals("library")) {
-                return [CAT_CULTURE, a];
+            if (a.equals("bar") || a.equals("pub") || a.equals("biergarten")) {
+                return [CAT_BAR, a];
             }
+            if (a.equals("theatre") || a.equals("cinema")
+                || a.equals("arts_centre")) {
+                return [CAT_THEATRE, a];
+            }
+            if (a.equals("place_of_worship")) { return [CAT_WORSHIP, a]; }
         }
         return null;
     }
