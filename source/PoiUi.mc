@@ -17,6 +17,9 @@ module PoiUi {
         menu.addItem(new WatchUi.MenuItem(
             WatchUi.loadResource(Rez.Strings.MenuRefresh) as String,
             null, "refresh", null));
+        menu.addItem(new WatchUi.MenuItem(
+            WatchUi.loadResource(Rez.Strings.MenuCalibrate) as String,
+            null, "calibrate", null));
         WatchUi.pushView(menu, new FilterMenuDelegate(model), WatchUi.SLIDE_UP);
     }
 
@@ -109,6 +112,11 @@ class FilterMenuDelegate extends WatchUi.Menu2InputDelegate {
         if (id instanceof String && id.equals("refresh")) {
             _model.forceRefresh();
             WatchUi.popView(WatchUi.SLIDE_DOWN);
+            return;
+        }
+        if (id instanceof String && id.equals("calibrate")) {
+            WatchUi.pushView(new CalibrationView(_model),
+                             new CalibrationDelegate(), WatchUi.SLIDE_LEFT);
             return;
         }
         if (item instanceof WatchUi.ToggleMenuItem && id instanceof Number) {

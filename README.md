@@ -183,7 +183,7 @@ and push — the workflow runs automatically.
 | `POI err -104` | Watch not connected to the phone / no internet |
 | `POI err 406` / `-400` / `504` / `429` | A mirror failed (overpass-api.de 406s a lot, which surfaces as -400). The app fails over to the next mirror and retries; usually transient. |
 | `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
-| Compass frozen | Calibrate compass (figure-8 motion); Venu X1 has a magnetometer |
+| Arrow points the wrong way / compass frozen | Open Filters → **Calibrate compass** and wave the watch in a figure-8 until "N" points north. (The OS auto-calibrates from the motion; Connect IQ can't trigger calibration directly. If it stays wrong, recalibrate in the watch's system Sensors settings.) |
 
 ## Adding more devices
 

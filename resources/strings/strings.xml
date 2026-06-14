@@ -10,6 +10,7 @@
     <string id="MenuFilters">Filters</string>
     <string id="MenuNearby">Nearby</string>
     <string id="MenuRefresh">Refresh now</string>
+    <string id="MenuCalibrate">Calibrate compass</string>
     <string id="ClearTarget">Clear target</string>
     <string id="MenuShowOnly">Show only (once)</string>
     <string id="MenuMyFilters">Back to my filters</string>
