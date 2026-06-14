@@ -77,7 +77,7 @@ class PoiModel {
     private var _fetchedMask as Number;  // land categories included in last fetch
     private var _ladderIdx as Number;    // current step in POI_RADII expanding search
     private var _opIndex as Number;      // current Overpass mirror
-    private var _opInit as Boolean;      // mirror seeded from position yet?
+    private var _opTries as Number;      // consecutive failures on this mirror
     private var _oneShotCat as Number;   // temporary "show only this" category, -1 = off
     private var _oneShotPending as Boolean;
     private var _dirty as Boolean;
@@ -130,7 +130,7 @@ class PoiModel {
         _fetchedMask = 0;
         _ladderIdx = 0;
         _opIndex = 0;
-        _opInit = false;
+        _opTries = 0;
         _oneShotCat = -1;
         _oneShotPending = false;
         _dirty = true;
@@ -403,8 +403,9 @@ class PoiModel {
             _dirty = true;
         }
         if (!anyLandCatEnabled()) { return; }
-        // Retry the current radius step after a transient failure.
-        if (poiStatus == STATUS_ERROR && since >= 8) {
+        // Retry after a transient failure. Short delay because overpass-api.de's
+        // 406s alternate per request, so a quick retry usually succeeds.
+        if (poiStatus == STATUS_ERROR && since >= 3) {
             fetchPois();
             return;
         }
@@ -441,10 +442,6 @@ class PoiModel {
             mask |= (1 << CAT_CASTLE) | (1 << CAT_RUINS);
         }
         _fetchedMask = mask;
-        if (!_opInit && lat != null) {
-            _opIndex = mirrorStart();   // pick a starting mirror from the position
-            _opInit = true;
-        }
         Communications.makeWebRequest(OVERPASS_MIRRORS[_opIndex],
                                       {"data" => buildQuery(POI_RADII[_ladderIdx])},
                                       overpassOptions(), method(:onPoiResponse));
@@ -455,14 +452,6 @@ class PoiModel {
             :method => Communications.HTTP_REQUEST_METHOD_GET,
             :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
         };
-    }
-
-    private function mirrorStart() as Number {
-        var a = (lat as Double).toNumber();
-        var b = (lon as Double).toNumber();
-        if (a < 0) { a = -a; }
-        if (b < 0) { b = -b; }
-        return (a + b) % OVERPASS_MIRRORS.size();
     }
 
     // JSON output (application/json is the only text-ish type the watch accepts
@@ -516,6 +505,7 @@ class PoiModel {
     function onPoiResponse(code as Number, data as Dictionary or String or Null) as Void {
         _fetchPending = false;
         if (code == 200 && data instanceof Dictionary) {
+            _opTries = 0;
             var fresh = parseElements(data["elements"]);
             if (fresh.size() > 0) {
                 finalizePois(fresh);
@@ -532,11 +522,17 @@ class PoiModel {
                 poiError = 0;
             }
         } else {
-            // Failure (e.g. overpass-api.de's intermittent 406 -> -400). Fail
-            // over to the next mirror; maybeFetchPois retries after a backoff.
+            // Failure (overpass-api.de intermittently 406s/504s -> -400). Its
+            // failures alternate per request, so retry the SAME mirror a few
+            // times (fast) before rotating to another - that avoids stalling on
+            // a mirror that may be slow/unreachable from the watch.
             poiStatus = STATUS_ERROR;
             poiError = code;
-            _opIndex = (_opIndex + 1) % OVERPASS_MIRRORS.size();
+            _opTries++;
+            if (_opTries >= 3) {
+                _opIndex = (_opIndex + 1) % OVERPASS_MIRRORS.size();
+                _opTries = 0;
+            }
         }
         WatchUi.requestUpdate();
     }

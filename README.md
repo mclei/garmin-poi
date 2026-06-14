@@ -50,7 +50,7 @@ any modern Connect IQ device you add to the manifest.
 
 | Data | Source | Notes |
 |------|--------|-------|
-| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Several **global mirrors** (`overpass-api.de`, `kumi.systems`, `private.coffee`); a starting one is picked from your position and the app **fails over to the next on any error** (overpass-api.de in particular intermittently 406s). Fetched at most every ~60 s and after moving >400 m. The expanding radius keeps the JSON response small enough to parse on-watch. Edit `OVERPASS_MIRRORS` in `source/PoiModel.mc` to change the list. |
+| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Starts on `overpass-api.de` and **retries fast a few times** (its 406/504s alternate per request, so a quick retry usually lands a 200), then **fails over** to `kumi.systems` / `private.coffee`. The query uses Overpass `convert` to project only the fields used → compact `application/json` (CSV would be smaller but the watch rejects `text/csv`). Fetched at most every ~60 s and after moving >400 m. Edit `OVERPASS_MIRRORS` in `source/PoiModel.mc` to change the list/order. |
 | Aircraft positions | [OpenSky Network](https://opensky-network.org) | Anonymous access has a daily request budget (~400 credits/day, 1–4 per call). Default refresh is 30 s; raise it in settings if you watch planes for hours. |
 | Aircraft type & route | [adsbdb.com](https://www.adsbdb.com) | Free, keyless. OpenSky has no type/destination, so the **focused** aircraft's type (by Mode-S address) and route (by callsign) are fetched here and cached. Only the focused plane is looked up, so volume stays low. |
 
