@@ -233,7 +233,9 @@ class MainView extends WatchUi.View {
     private function drawStatus(dc as Dc, cx as Number, cy as Number,
                                 ring as Number, w as Number, h as Number) as Void {
         var hdg = _model.headingDeg;
-        var s = hdg.toNumber().toString() + " " + GeoUtils.cardinal(hdg) + " | ";
+        var approx = (_model.posApprox && _model.lat != null) ? "~" : "";
+        var s = approx + hdg.toNumber().toString() + " "
+              + GeoUtils.cardinal(hdg) + " | ";
         if (_model.lat == null) {
             s += "no fix";
         } else if (_model.poiStatus == STATUS_LOADING) {

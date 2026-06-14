@@ -39,6 +39,9 @@ any modern Connect IQ device you add to the manifest.
   widens (500 m → 1 → 2 → 5 km) only until something is found, so in a city
   you get the things right around you and in open country it reaches out to
   the nearest POI up to 5 km. Aircraft use the configured radius (default 5 km).
+- **Fast start** — on launch the app seeds from the cached last-known position
+  so POIs load immediately while the GPS warms up. The status line shows a
+  leading `~` until a precise fix arrives, then the list is refined to it.
 
 ## Data sources (free, no API keys)
 

@@ -37,6 +37,7 @@ class PoiModel {
     public var lat as Double?;
     public var lon as Double?;
     public var gpsQuality as Number;
+    public var posApprox as Boolean;  // true until a usable-quality fix arrives
     public var headingDeg as Float;
 
     // Data
@@ -89,6 +90,7 @@ class PoiModel {
         lat = null;
         lon = null;
         gpsQuality = 0;
+        posApprox = false;
         headingDeg = 0.0;
         pois = [] as Array<Poi>;
         aircraft = [] as Array<Poi>;
@@ -133,6 +135,19 @@ class PoiModel {
     function start() as Void {
         Position.enableLocationEvents(Position.LOCATION_CONTINUOUS,
                                       method(:onPosition));
+        // Seed with the cached last-known location so POIs can load while the
+        // GPS is still acquiring a precise fix. Marked approximate until a
+        // usable-quality fix arrives (handled in onPosition).
+        var info = Position.getInfo();
+        if (info != null && info.position != null) {
+            var deg = info.position.toDegrees();
+            lat = deg[0].toDouble();
+            lon = deg[1].toDouble();
+            var q = (info.accuracy != null) ? info.accuracy as Number : 0;
+            gpsQuality = q;
+            posApprox = (q < Position.QUALITY_USABLE);
+            updateDerived();
+        }
     }
 
     function stop() as Void {
@@ -210,8 +225,14 @@ class PoiModel {
             var deg = info.position.toDegrees();
             lat = deg[0].toDouble();
             lon = deg[1].toDouble();
-            if (info.accuracy != null) {
-                gpsQuality = info.accuracy as Number;
+            var q = (info.accuracy != null) ? info.accuracy as Number : gpsQuality;
+            gpsQuality = q;
+            // First usable-quality fix: drop the approximate flag and refine the
+            // POI list at the precise location even if we moved less than 400 m.
+            if (posApprox && q >= Position.QUALITY_USABLE) {
+                posApprox = false;
+                _needPoiFetch = true;
+                _lastPoiAttemptSec = 0;
             }
             updateDerived();
         }
