@@ -47,6 +47,46 @@ module PoiUi {
         var v = new DetailView(model, poi);
         WatchUi.pushView(v, new DetailDelegate(v), WatchUi.SLIDE_LEFT);
     }
+
+    // Quick one-shot picker: load only one category now, without touching the
+    // saved filters (they apply again on the next normal search).
+    function pushQuickMenu(model as PoiModel) as Void {
+        var menu = new WatchUi.Menu2({
+            :title => WatchUi.loadResource(Rez.Strings.MenuShowOnly)
+        });
+        for (var c = 0; c < NUM_CATS; c++) {
+            menu.addItem(new WatchUi.MenuItem(
+                WatchUi.loadResource(PoiCat.label(c)) as String, null, c, null));
+        }
+        if (model.oneShotCategory() >= 0) {
+            menu.addItem(new WatchUi.MenuItem(
+                WatchUi.loadResource(Rez.Strings.MenuMyFilters) as String,
+                null, -1, null));
+        }
+        WatchUi.pushView(menu, new QuickMenuDelegate(model), WatchUi.SLIDE_UP);
+    }
+}
+
+class QuickMenuDelegate extends WatchUi.Menu2InputDelegate {
+
+    private var _model as PoiModel;
+
+    function initialize(model as PoiModel) {
+        Menu2InputDelegate.initialize();
+        _model = model;
+    }
+
+    function onSelect(item as WatchUi.MenuItem) as Void {
+        var id = item.getId();
+        if (id instanceof Number) {
+            if (id == -1) {
+                _model.clearOneShot();
+            } else {
+                _model.loadOnlyCategory(id);
+            }
+        }
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
+    }
 }
 
 class FilterMenuDelegate extends WatchUi.Menu2InputDelegate {

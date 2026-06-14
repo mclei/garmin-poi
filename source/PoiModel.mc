@@ -78,6 +78,8 @@ class PoiModel {
     private var _ladderIdx as Number;    // current step in POI_RADII expanding search
     private var _opIndex as Number;      // current Overpass mirror
     private var _opInit as Boolean;      // mirror seeded from position yet?
+    private var _oneShotCat as Number;   // temporary "show only this" category, -1 = off
+    private var _oneShotPending as Boolean;
     private var _dirty as Boolean;
 
     // Aircraft detail caches (resolved lazily from adsbdb for the focused plane)
@@ -129,6 +131,8 @@ class PoiModel {
         _ladderIdx = 0;
         _opIndex = 0;
         _opInit = false;
+        _oneShotCat = -1;
+        _oneShotPending = false;
         _dirty = true;
         _acType = {} as Dictionary;
         _acRoute = {} as Dictionary;
@@ -209,6 +213,37 @@ class PoiModel {
         _needPoiFetch = true;
         _lastPoiAttemptSec = 0;
         _lastAirAttemptSec = 0;
+    }
+
+    // Whether a category is active for the current search/display: while a
+    // one-shot override is set, only that category counts; otherwise the saved
+    // toggles apply. Saved settings are never modified by the override.
+    function effectiveCatEnabled(cat as Number) as Boolean {
+        if (_oneShotCat >= 0) { return cat == _oneShotCat; }
+        return catEnabled[cat];
+    }
+
+    function oneShotCategory() as Number {
+        return _oneShotCat;
+    }
+
+    // One-time shot: show only this category now, without changing settings.
+    // The next normal search (move/refresh/filter change) reverts to settings.
+    function loadOnlyCategory(cat as Number) as Void {
+        _oneShotCat = cat;
+        _dirty = true;
+        if (cat < NUM_LAND_CATS) {
+            _oneShotPending = true;     // trigger a land fetch for just this cat
+            _lastPoiAttemptSec = 0;
+        } else {
+            _lastAirAttemptSec = 0;     // aircraft: force an immediate refresh
+        }
+    }
+
+    function clearOneShot() as Void {
+        if (_oneShotCat < 0) { return; }
+        _oneShotCat = -1;
+        forceRefresh();                 // back to the saved filters
     }
 
     private function getNumProp(key as String, def as Number) as Number {
@@ -293,9 +328,9 @@ class PoiModel {
         var out = [] as Array<Poi>;
         for (var i = 0; i < pois.size(); i++) {
             var p = pois[i];
-            if (catEnabled[p.category]) { out.add(p); }
+            if (effectiveCatEnabled(p.category)) { out.add(p); }
         }
-        if (catEnabled[CAT_AIRCRAFT]) {
+        if (effectiveCatEnabled(CAT_AIRCRAFT)) {
             for (var i = 0; i < aircraft.size(); i++) {
                 out.add(aircraft[i]);
             }
@@ -303,7 +338,7 @@ class PoiModel {
         GeoUtils.sortByDistance(out);
         visible = out;
         var t = targetPoi;
-        if (t != null && !catEnabled[t.category]) {
+        if (t != null && !effectiveCatEnabled(t.category)) {
             targetPoi = null;
         }
         _dirty = false;
@@ -332,7 +367,7 @@ class PoiModel {
 
     private function anyLandCatEnabled() as Boolean {
         for (var c = 0; c < NUM_LAND_CATS; c++) {
-            if (catEnabled[c]) { return true; }
+            if (effectiveCatEnabled(c)) { return true; }
         }
         return false;
     }
@@ -341,15 +376,18 @@ class PoiModel {
 
     private function maybeFetchPois(now as Number) as Void {
         if (_fetchPending || _airPending) { return; }
-        if (!anyLandCatEnabled()) { return; }
-        var since = now - _lastPoiAttemptSec;
-        // Retry the current radius step after a transient failure.
-        if (poiStatus == STATUS_ERROR && since >= 8) {
+        // One-shot land search just requested: fetch it without clearing the
+        // override (so following normal searches can revert it).
+        if (_oneShotPending && _oneShotCat >= 0 && _oneShotCat < NUM_LAND_CATS) {
+            _oneShotPending = false;
+            _ladderIdx = startLadderIndex();
             fetchPois();
             return;
         }
-        // Start a fresh expanding search (from the tightest radius) on the
-        // first fix, a filter/refresh request, or after moving far.
+        // Decide whether a fresh normal search is warranted (first fix, a
+        // filter/refresh request, or moving far). Computed before the land
+        // check so an aircraft-only one-shot still reverts on these triggers.
+        var since = now - _lastPoiAttemptSec;
         var fresh = false;
         if (_fetchLat == null) {
             fresh = (since >= 5);
@@ -359,6 +397,16 @@ class PoiModel {
             var moved = GeoUtils.distanceM(lat as Double, lon as Double,
                                            _fetchLat as Double, _fetchLon as Double);
             fresh = (moved > 400.0);
+        }
+        if (fresh && _oneShotCat >= 0) {
+            _oneShotCat = -1;   // a normal search reverts the one-time override
+            _dirty = true;
+        }
+        if (!anyLandCatEnabled()) { return; }
+        // Retry the current radius step after a transient failure.
+        if (poiStatus == STATUS_ERROR && since >= 8) {
+            fetchPois();
+            return;
         }
         if (fresh) {
             _ladderIdx = startLadderIndex();
@@ -385,7 +433,7 @@ class PoiModel {
         _needPoiFetch = false;
         var mask = 0;
         for (var c = 0; c < NUM_LAND_CATS; c++) {
-            if (catEnabled[c]) { mask |= (1 << c); }
+            if (effectiveCatEnabled(c)) { mask |= (1 << c); }
         }
         // A broad nwr[historic] query also returns castles/ruins, so mark them
         // covered to avoid a redundant refetch when those toggles flip on.
@@ -429,34 +477,34 @@ class PoiModel {
         // Historic: a broad nwr[historic] covers monuments/memorials and is
         // classified down to castles/ruins; if only the narrow toggles are on,
         // fetch just those subsets.
-        if (catEnabled[CAT_MONUMENT]) {
+        if (effectiveCatEnabled(CAT_MONUMENT)) {
             q += "nwr[historic]" + ar;
         } else {
-            if (catEnabled[CAT_CASTLE]) {
+            if (effectiveCatEnabled(CAT_CASTLE)) {
                 q += "nwr[historic~\"^(castle|fort|fortress|city_gate|citadel|castle_wall|manor|palace)$\"]" + ar;
             }
-            if (catEnabled[CAT_RUINS]) {
+            if (effectiveCatEnabled(CAT_RUINS)) {
                 q += "nwr[historic~\"^(ruins|archaeological_site)$\"]" + ar;
             }
         }
-        if (catEnabled[CAT_VIEWPOINT]) {
+        if (effectiveCatEnabled(CAT_VIEWPOINT)) {
             q += "nwr[tourism~\"^(attraction|viewpoint)$\"]" + ar;
         }
         var food = "";
-        if (catEnabled[CAT_RESTAURANT]) { food += "restaurant|"; }
-        if (catEnabled[CAT_CAFE]) { food += "cafe|fast_food|ice_cream|"; }
-        if (catEnabled[CAT_BAR]) { food += "bar|pub|biergarten|"; }
+        if (effectiveCatEnabled(CAT_RESTAURANT)) { food += "restaurant|"; }
+        if (effectiveCatEnabled(CAT_CAFE)) { food += "cafe|fast_food|ice_cream|"; }
+        if (effectiveCatEnabled(CAT_BAR)) { food += "bar|pub|biergarten|"; }
         if (food.length() > 0) {
             food = food.substring(0, food.length() - 1); // drop trailing '|'
             q += "nwr[amenity~\"^(" + food + ")$\"]" + ar;
         }
-        if (catEnabled[CAT_MUSEUM]) {
+        if (effectiveCatEnabled(CAT_MUSEUM)) {
             q += "nwr[tourism~\"^(museum|gallery|artwork)$\"]" + ar;
         }
-        if (catEnabled[CAT_THEATRE]) {
+        if (effectiveCatEnabled(CAT_THEATRE)) {
             q += "nwr[amenity~\"^(theatre|cinema|arts_centre)$\"]" + ar;
         }
-        if (catEnabled[CAT_WORSHIP]) {
+        if (effectiveCatEnabled(CAT_WORSHIP)) {
             q += "nwr[amenity=place_of_worship]" + ar;
         }
         q += ")->.r;.r convert poi ::id=id(),tp=type(),::geom=center(geom()),"
@@ -626,7 +674,7 @@ class PoiModel {
 
     private function maybeFetchAircraft(now as Number) as Void {
         if (_fetchPending || _airPending) { return; }
-        if (!catEnabled[CAT_AIRCRAFT]) {
+        if (!effectiveCatEnabled(CAT_AIRCRAFT)) {
             if (aircraft.size() > 0) {
                 aircraft = [] as Array<Poi>;
                 _dirty = true;
@@ -727,7 +775,7 @@ class PoiModel {
     }
 
     private function maybeResolveAircraft(now as Number) as Void {
-        if (!catEnabled[CAT_AIRCRAFT]) { return; }
+        if (!effectiveCatEnabled(CAT_AIRCRAFT)) { return; }
         var f = focusedPoi();
         if (f == null || f.category != CAT_AIRCRAFT) { return; }
         resolveAircraftFor(f);

@@ -126,6 +126,7 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 |-------|--------|
 | **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: full description/tags for places, type + route for aircraft) |
 | **Swipe in from the right edge** | Filters menu (settings) — category toggles + "Refresh now" |
+| **Swipe down** | Quick "show only one category" — a one-shot (e.g. just restaurants, or just aircraft) that does **not** change your saved filters; the next normal search reverts to them |
 | Swipe up | Nearest-POI list; select an entry opens its detail page |
 | Long-press screen | Filters menu (only where the firmware emits it) |
 | Back | Exit |

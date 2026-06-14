@@ -5,6 +5,7 @@ import Toybox.WatchUi;
 //   Tap, or Start/Enter button .. detail page of the shown POI
 //   Swipe in from right edge .... Filters menu (settings)
 //   Swipe up .................... Nearby POI list
+//   Swipe down .................. Quick "show only one category" (one-shot)
 //   Long-press (where supported)  Filters menu
 //   Back ........................ exit
 class MainDelegate extends WatchUi.BehaviorDelegate {
@@ -43,6 +44,10 @@ class MainDelegate extends WatchUi.BehaviorDelegate {
         }
         if (dir == WatchUi.SWIPE_UP) {
             PoiUi.pushPoiList(_model);
+            return true;
+        }
+        if (dir == WatchUi.SWIPE_DOWN) {
+            PoiUi.pushQuickMenu(_model);
             return true;
         }
         return false;

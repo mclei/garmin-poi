@@ -234,8 +234,11 @@ class MainView extends WatchUi.View {
                                 ring as Number, w as Number, h as Number) as Void {
         var hdg = _model.headingDeg;
         var approx = (_model.posApprox && _model.lat != null) ? "~" : "";
-        var s = approx + hdg.toNumber().toString() + " "
-              + GeoUtils.cardinal(hdg) + " | ";
+        var s = "";
+        var os = _model.oneShotCategory();
+        if (os >= 0) { s += "only " + PoiCat.shortName(os) + " | "; }
+        s += approx + hdg.toNumber().toString() + " "
+           + GeoUtils.cardinal(hdg) + " | ";
         if (_model.lat == null) {
             s += "no fix";
         } else if (_model.poiStatus == STATUS_LOADING) {
@@ -245,7 +248,7 @@ class MainView extends WatchUi.View {
         } else {
             s += _model.visible.size().toString() + " POI";
         }
-        if (_model.catEnabled[CAT_AIRCRAFT]) {
+        if (_model.effectiveCatEnabled(CAT_AIRCRAFT)) {
             if (_model.airStatus == STATUS_ERROR) {
                 s += " | air err " + _model.airError.toString();
             } else {
