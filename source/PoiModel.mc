@@ -24,17 +24,18 @@ const ADSBDB_AIRCRAFT_URL = "https://api.adsbdb.com/v0/aircraft/";
 const ADSBDB_CALLSIGN_URL = "https://api.adsbdb.com/v0/callsign/";
 
 // Land POIs use an expanding search: start tight and widen only when nothing
-// is found, up to 5 km. In a dense city you stop at 200 m (tiny response); in
-// open country you reach far, where there is little to return anyway. This is
-// what keeps the response small enough for the watch to parse everywhere.
-const POI_RADII = [200, 500, 1000, 2000, 5000] as Array<Number>;
+// is found, up to 5 km. The starting radius depends on GPS precision (50 m on
+// a good fix, wider when approximate) - see startLadderIndex(). In a dense
+// city you stop almost immediately (tiny response); in open country you reach
+// far, where there is little to return anyway.
+const POI_RADII = [50, 100, 200, 500, 1000, 2000, 5000] as Array<Number>;
 
 // Hard cap on returned elements, so a dense stopping radius can't produce a
-// JSON response too large to parse (each element is ~300-500 bytes). We only
-// display the nearest maxPois anyway. No "qt" sort: quadtile order biases the
-// capped set to one corner; plain id order is geographically even and we
-// distance-sort on the device.
-const POI_MAX_ELEMENTS = 100;
+// response too large to parse. The query uses Overpass `convert` to project
+// only the fields we use (~230 bytes/element), so 60 elements is ~14 KB. We
+// only display the nearest maxPois anyway. No "qt" sort: quadtile order biases
+// the capped set to one corner; plain id order is even and we distance-sort.
+const POI_MAX_ELEMENTS = 60;
 
 const MAX_AIRCRAFT = 25;
 
@@ -360,9 +361,19 @@ class PoiModel {
             fresh = (moved > 400.0);
         }
         if (fresh) {
-            _ladderIdx = 0;
+            _ladderIdx = startLadderIndex();
             fetchPois();
         }
+    }
+
+    // Tightest sensible starting radius for the expanding search, based on how
+    // precise the current fix is: a 50 m search only makes sense when the
+    // position is accurate to a few metres; an approximate/last-known position
+    // starts wider so it isn't searching the wrong 50 m circle.
+    private function startLadderIndex() as Number {
+        if (!posApprox && gpsQuality >= Position.QUALITY_GOOD)   { return 0; } // 50 m
+        if (!posApprox && gpsQuality >= Position.QUALITY_USABLE) { return 2; } // 200 m
+        return 3; // approximate or poor -> 500 m
     }
 
     private function fetchPois() as Void {
@@ -406,9 +417,10 @@ class PoiModel {
         return (a + b) % OVERPASS_MIRRORS.size();
     }
 
-    // JSON output (application/json matches the JSON response type cleanly; CSV
-    // is text/csv which the watch rejects as not text/plain -> error -400). The
-    // expanding radius keeps the element count, hence the JSON size, small.
+    // JSON output (application/json is the only text-ish type the watch accepts
+    // - CSV is text/csv which gives -400). Overpass `convert` projects only the
+    // fields we use (~230 bytes/element vs ~450 for full tags), keeping the
+    // response small enough to parse; center(geom()) gives way/relation centers.
     private function buildQuery(radius as Number) as String {
         var la = (lat as Double).format("%.5f");
         var lo = (lon as Double).format("%.5f");
@@ -447,7 +459,9 @@ class PoiModel {
         if (catEnabled[CAT_WORSHIP]) {
             q += "nwr[amenity=place_of_worship]" + ar;
         }
-        q += ");out center " + POI_MAX_ELEMENTS.toString() + ";";
+        q += ")->.r;.r convert poi ::id=id(),tp=type(),::geom=center(geom()),"
+           + "name=t[\"name\"],h=t[\"historic\"],to=t[\"tourism\"],a=t[\"amenity\"];"
+           + "out geom " + POI_MAX_ELEMENTS.toString() + ";";
         return q;
     }
 
@@ -496,7 +510,9 @@ class PoiModel {
         poiError = 0;
     }
 
-    // Parse Overpass JSON elements into Poi objects.
+    // Parse the projected `convert` output. Each element is:
+    //   {type:"poi", id:<origId>, geometry:{coordinates:[lon,lat]},
+    //    tags:{tp:<node|way|relation>, name, h, to, a}}
     private function parseElements(elements) as Array<Poi> {
         var out = [] as Array<Poi>;
         if (!(elements instanceof Array)) { return out; }
@@ -505,25 +521,22 @@ class PoiModel {
             if (!(el instanceof Dictionary)) { continue; }
             var tags = el["tags"];
             if (!(tags instanceof Dictionary)) { continue; }
-            var plat = numToD(el["lat"]);
-            var plon = numToD(el["lon"]);
-            if (plat == null) {
-                var c = el["center"];   // ways/relations carry a center
-                if (c instanceof Dictionary) {
-                    plat = numToD(c["lat"]);
-                    plon = numToD(c["lon"]);
-                }
-            }
+            var geom = el["geometry"];
+            if (!(geom instanceof Dictionary)) { continue; }
+            var coords = geom["coordinates"];
+            if (!(coords instanceof Array) || coords.size() < 2) { continue; }
+            var plon = numToD(coords[0]);   // GeoJSON order is [lon, lat]
+            var plat = numToD(coords[1]);
             if (plat == null || plon == null) { continue; }
-            var cd = categorizeTags(strOf(tags["historic"]),
-                                    strOf(tags["tourism"]),
-                                    strOf(tags["amenity"]));
+            var cd = categorizeTags(strOf(tags["h"]),
+                                    strOf(tags["to"]),
+                                    strOf(tags["a"]));
             if (cd == null) { continue; }
             var subtype = prettify(cd[1] as String);
             var name = strOf(tags["name"]);
             if (name.length() == 0) { name = subtype; }
             var p = new Poi(name, plat, plon, cd[0] as Number, subtype);
-            p.osmType = strOf(el["type"]);
+            p.osmType = strOf(tags["tp"]);
             var idv = el["id"];
             p.osmId = (idv != null) ? idv.toString() : "";
             out.add(p);

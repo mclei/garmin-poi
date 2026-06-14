@@ -35,10 +35,13 @@ any modern Connect IQ device you add to the manifest.
     and speed. Type and route are looked up on demand for the focused plane.
 
   Defaults on: Monuments, Castles, Ruins, Viewpoints, Restaurants, Museums.
-- **Range** — land POIs use an *expanding search*: it starts at 200 m and
-  widens (500 m → 1 → 2 → 5 km) only until something is found, so in a city
-  you get the things right around you and in open country it reaches out to
-  the nearest POI up to 5 km. Aircraft use the configured radius (default 5 km).
+- **Range** — land POIs use an *expanding search* that widens only until
+  something is found (up to 5 km). The starting radius tracks GPS precision:
+  **50 m** on a good fix, ~200 m on a usable one, ~500 m while the position is
+  still approximate — so a precise fix in a city shows exactly what's right in
+  front of you. The query uses Overpass `convert` to return only the fields it
+  needs, keeping the response small enough to parse on-watch. Aircraft use the
+  configured radius (default 5 km).
 - **Fast start** — on launch the app seeds from the cached last-known position
   so POIs load immediately while the GPS warms up. The status line shows a
   leading `~` until a precise fix arrives, then the list is refined to it.
