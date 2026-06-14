@@ -23,7 +23,7 @@
     <string id="CatWorship">Places of worship</string>
     <string id="CatAircraft">Aircraft (live)</string>
 
-    <string id="SetRadius">Search radius (m)</string>
+    <string id="SetRadius">Aircraft radius (m)</string>
     <string id="SetMaxPois">Max places shown</string>
     <string id="SetAirRefresh">Aircraft refresh (s)</string>
 </strings>

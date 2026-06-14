@@ -7,17 +7,20 @@ import Toybox.Sensor;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-// Public Overpass mirrors. The main overpass-api.de instance intermittently
-// serves a 406 HTML page from one of its load-balanced backends; the watch
-// cannot parse that as JSON and reports error -400. We rotate to the next
-// mirror on any failed request so a transient failure recovers quickly.
-const OVERPASS_ENDPOINTS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.osm.ch/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter"
-];
+const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const OPENSKY_URL = "https://opensky-network.org/api/states/all";
+
+// Land POIs use an expanding search: start tight and widen only when nothing
+// is found, up to 5 km. In a dense city you stop at 200 m (tiny response); in
+// open country you reach far, where there is little to return anyway. This is
+// what keeps the response small enough for the watch to parse everywhere.
+const POI_RADII = [200, 500, 1000, 2000, 5000] as Array<Number>;
+
+// Hard cap on returned rows, purely so a dense stopping radius can't produce a
+// response too large to parse. No "qt" sort here: quadtile order biases the
+// capped set to one corner; plain id order is geographically even and we
+// distance-sort on the device regardless.
+const POI_MAX_ELEMENTS = 250;
 
 const MAX_AIRCRAFT = 25;
 
@@ -56,7 +59,7 @@ class PoiModel {
     private var _fetchLat as Double?;
     private var _fetchLon as Double?;
     private var _fetchedMask as Number;  // land categories included in last fetch
-    private var _opIndex as Number;      // current Overpass mirror
+    private var _ladderIdx as Number;    // current step in POI_RADII expanding search
     private var _dirty as Boolean;
 
     function initialize() {
@@ -87,7 +90,7 @@ class PoiModel {
         _fetchLat = null;
         _fetchLon = null;
         _fetchedMask = 0;
-        _opIndex = 0;
+        _ladderIdx = 0;
         _dirty = true;
         reloadSettings();
     }
@@ -270,28 +273,33 @@ class PoiModel {
         if (_fetchPending || _airPending) { return; }
         if (!anyLandCatEnabled()) { return; }
         var since = now - _lastPoiAttemptSec;
-        var doFetch = false;
+        // Retry the current radius step after a transient failure.
+        if (poiStatus == STATUS_ERROR && since >= 8) {
+            fetchPois();
+            return;
+        }
+        // Start a fresh expanding search (from the tightest radius) on the
+        // first fix, a filter/refresh request, or after moving far.
+        var fresh = false;
         if (_fetchLat == null) {
-            // first fix: fetch right away (attempt timestamp paces retries)
-            doFetch = (since >= 5);
-        } else {
+            fresh = (since >= 5);
+        } else if (_needPoiFetch && since >= 10) {
+            fresh = true;
+        } else if (since >= 60) {
             var moved = GeoUtils.distanceM(lat as Double, lon as Double,
                                            _fetchLat as Double, _fetchLon as Double);
-            if (_needPoiFetch && since >= 10) {
-                doFetch = true;
-            } else if (poiStatus == STATUS_ERROR && since >= 8) {
-                doFetch = true;
-            } else if (moved > 400.0 && since >= 60) {
-                doFetch = true;
-            }
+            fresh = (moved > 400.0);
         }
-        if (doFetch) { fetchPois(now); }
+        if (fresh) {
+            _ladderIdx = 0;
+            fetchPois();
+        }
     }
 
-    private function fetchPois(now as Number) as Void {
+    private function fetchPois() as Void {
         _fetchPending = true;
         poiStatus = STATUS_LOADING;
-        _lastPoiAttemptSec = now;
+        _lastPoiAttemptSec = Time.now().value();
         _fetchLat = lat;
         _fetchLon = lon;
         _needPoiFetch = false;
@@ -307,110 +315,87 @@ class PoiModel {
         _fetchedMask = mask;
         var options = {
             :method => Communications.HTTP_REQUEST_METHOD_GET,
-            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
+            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_TEXT_PLAIN
         };
-        var url = OVERPASS_ENDPOINTS[_opIndex % OVERPASS_ENDPOINTS.size()];
-        Communications.makeWebRequest(url, {"data" => buildQuery()},
+        Communications.makeWebRequest(OVERPASS_URL,
+                                      {"data" => buildQuery(POI_RADII[_ladderIdx])},
                                       options, method(:onPoiResponse));
     }
 
-    private function buildQuery() as String {
+    // CSV output requesting only the columns we use keeps the response tiny
+    // (~50 bytes/row vs ~550 for full JSON), which is what lets the watch parse
+    // it. Columns: type, lat, lon, name, historic, tourism, amenity (tab-sep).
+    private function buildQuery(radius as Number) as String {
         var la = (lat as Double).format("%.5f");
         var lo = (lon as Double).format("%.5f");
-        var r = radiusM.toString();
-        var around = "(around:" + r + "," + la + "," + lo + ");";
-        // restaurants beyond 2 km are rarely interesting and bloat the response
-        var rFood = (radiusM < 2000) ? radiusM : 2000;
-        var aroundFood = "(around:" + rFood.toString() + "," + la + "," + lo + ");";
-        var q = "[out:json][timeout:10];(";
+        var ar = "(around:" + radius.toString() + "," + la + "," + lo + ");";
+        var q = "[out:csv(::type,::lat,::lon,name,historic,tourism,amenity;false)]"
+              + "[timeout:25];(";
         // Historic: a broad nwr[historic] covers monuments/memorials and is
         // classified down to castles/ruins; if only the narrow toggles are on,
         // fetch just those subsets.
         if (catEnabled[CAT_MONUMENT]) {
-            q += "nwr[historic]" + around;
+            q += "nwr[historic]" + ar;
         } else {
             if (catEnabled[CAT_CASTLE]) {
-                q += "nwr[historic~\"^(castle|fort|fortress|city_gate|citadel|castle_wall|manor|palace)$\"]" + around;
+                q += "nwr[historic~\"^(castle|fort|fortress|city_gate|citadel|castle_wall|manor|palace)$\"]" + ar;
             }
             if (catEnabled[CAT_RUINS]) {
-                q += "nwr[historic~\"^(ruins|archaeological_site)$\"]" + around;
+                q += "nwr[historic~\"^(ruins|archaeological_site)$\"]" + ar;
             }
         }
         if (catEnabled[CAT_VIEWPOINT]) {
-            q += "nwr[tourism~\"^(attraction|viewpoint)$\"]" + around;
+            q += "nwr[tourism~\"^(attraction|viewpoint)$\"]" + ar;
         }
-        // Food & drink (radius-capped): build the amenity alternation from the
-        // enabled sub-toggles.
         var food = "";
         if (catEnabled[CAT_RESTAURANT]) { food += "restaurant|"; }
         if (catEnabled[CAT_CAFE]) { food += "cafe|fast_food|ice_cream|"; }
         if (catEnabled[CAT_BAR]) { food += "bar|pub|biergarten|"; }
         if (food.length() > 0) {
             food = food.substring(0, food.length() - 1); // drop trailing '|'
-            q += "nwr[amenity~\"^(" + food + ")$\"]" + aroundFood;
+            q += "nwr[amenity~\"^(" + food + ")$\"]" + ar;
         }
         if (catEnabled[CAT_MUSEUM]) {
-            q += "nwr[tourism~\"^(museum|gallery|artwork)$\"]" + around;
+            q += "nwr[tourism~\"^(museum|gallery|artwork)$\"]" + ar;
         }
         if (catEnabled[CAT_THEATRE]) {
-            q += "nwr[amenity~\"^(theatre|cinema|arts_centre)$\"]" + around;
+            q += "nwr[amenity~\"^(theatre|cinema|arts_centre)$\"]" + ar;
         }
         if (catEnabled[CAT_WORSHIP]) {
-            q += "nwr[amenity=place_of_worship]" + around;
+            q += "nwr[amenity=place_of_worship]" + ar;
         }
-        q += ");out center qt 120;";
+        q += ");out center " + POI_MAX_ELEMENTS.toString() + ";";
         return q;
     }
 
     function onPoiResponse(code as Number, data as Dictionary or String or Null) as Void {
         _fetchPending = false;
-        if (code == 200 && data instanceof Dictionary) {
-            var elements = data["elements"];
-            if (elements instanceof Array) {
-                parseElements(elements);
+        if (code == 200 && data instanceof String) {
+            var fresh = parseCsv(data);
+            if (fresh.size() > 0) {
+                finalizePois(fresh);
+            } else if (_ladderIdx < POI_RADII.size() - 1) {
+                // Nothing within this radius: widen the search and try again.
+                _ladderIdx++;
+                fetchPois();
+                return;
+            } else {
+                // Nothing even within the largest radius.
+                pois = [] as Array<Poi>;
+                _dirty = true;
                 poiStatus = STATUS_IDLE;
                 poiError = 0;
-            } else {
-                poiStatus = STATUS_ERROR;
-                poiError = -1;
-                _opIndex = (_opIndex + 1) % OVERPASS_ENDPOINTS.size();
             }
         } else {
+            // Transient (overpass-api.de intermittently 406s/504s); retried by
+            // maybeFetchPois against the same radius after a short backoff.
             poiStatus = STATUS_ERROR;
             poiError = code;
-            // Rotate to the next mirror; a 406/5xx/parse error on one backend
-            // usually succeeds on another.
-            _opIndex = (_opIndex + 1) % OVERPASS_ENDPOINTS.size();
         }
         WatchUi.requestUpdate();
     }
 
-    private function parseElements(elements as Array) as Void {
-        var fresh = [] as Array<Poi>;
-        for (var i = 0; i < elements.size(); i++) {
-            var el = elements[i];
-            if (!(el instanceof Dictionary)) { continue; }
-            var tags = el["tags"];
-            if (!(tags instanceof Dictionary)) { continue; }
-            var plat = numToD(el["lat"]);
-            var plon = numToD(el["lon"]);
-            if (plat == null) {
-                var c = el["center"];
-                if (c instanceof Dictionary) {
-                    plat = numToD(c["lat"]);
-                    plon = numToD(c["lon"]);
-                }
-            }
-            if (plat == null || plon == null) { continue; }
-            var cd = categorize(tags);
-            if (cd == null) { continue; }
-            var subtype = prettify(cd[1] as String);
-            var name = tags["name"];
-            if (!(name instanceof String) || name.length() == 0) {
-                name = subtype;
-            }
-            fresh.add(new Poi(name, plat, plon, cd[0] as Number, subtype));
-        }
+    private function finalizePois(fresh as Array<Poi>) as Void {
         if (lat != null) {
             var la = lat as Double;
             var lo = lon as Double;
@@ -423,11 +408,64 @@ class PoiModel {
         GeoUtils.sortByDistance(fresh);
         pois = dedupeAndCap(fresh);
         _dirty = true;
+        poiStatus = STATUS_IDLE;
+        poiError = 0;
     }
 
-    private function categorize(tags as Dictionary) as Array? {
-        var h = tags["historic"];
-        if (h instanceof String) {
+    // Parse tab-separated CSV rows into Poi objects in a single pass.
+    private function parseCsv(text as String) as Array<Poi> {
+        var out = [] as Array<Poi>;
+        var chars = text.toCharArray();
+        var n = chars.size();
+        var cols = new Array<String>[7];
+        for (var k = 0; k < 7; k++) { cols[k] = ""; }
+        var field = 0;
+        var cur = "";
+        for (var i = 0; i <= n; i++) {
+            var ch = (i < n) ? chars[i] : '\n';
+            if (ch == '\t') {
+                if (field < 7) { cols[field] = cur; }
+                field++;
+                cur = "";
+            } else if (ch == '\n') {
+                if (field < 7) { cols[field] = cur; }
+                if (field >= 6) {            // a full row has 6 tabs / 7 columns
+                    var poi = rowToPoi(cols);
+                    if (poi != null) { out.add(poi); }
+                }
+                for (var k2 = 0; k2 < 7; k2++) { cols[k2] = ""; }
+                field = 0;
+                cur = "";
+            } else if (ch != '\r') {
+                cur += ch.toString();
+            }
+        }
+        return out;
+    }
+
+    // cols = [type, lat, lon, name, historic, tourism, amenity]
+    private function rowToPoi(cols as Array<String>) as Poi? {
+        var plat = parseCoord(cols[1]);
+        var plon = parseCoord(cols[2]);
+        if (plat == null || plon == null) { return null; }
+        var cd = categorizeTags(cols[4], cols[5], cols[6]);
+        if (cd == null) { return null; }
+        var subtype = prettify(cd[1] as String);
+        var name = cols[3];
+        if (name.length() == 0) { name = subtype; }
+        return new Poi(name, plat, plon, cd[0] as Number, subtype);
+    }
+
+    private function parseCoord(s as String) as Double? {
+        if (s.length() == 0) { return null; }
+        var f = s.toFloat();
+        if (f == null) { return null; }
+        return f.toDouble();
+    }
+
+    // Classify from the historic/tourism/amenity column values (empty = absent).
+    private function categorizeTags(h as String, t as String, a as String) as Array? {
+        if (h.length() > 0) {
             if (h.equals("castle") || h.equals("fort") || h.equals("fortress")
                 || h.equals("city_gate") || h.equals("citadel")
                 || h.equals("castle_wall") || h.equals("manor")
@@ -439,8 +477,7 @@ class PoiModel {
             }
             return [CAT_MONUMENT, h]; // monuments, memorials, other historic
         }
-        var t = tags["tourism"];
-        if (t instanceof String) {
+        if (t.length() > 0) {
             if (t.equals("attraction") || t.equals("viewpoint")) {
                 return [CAT_VIEWPOINT, t];
             }
@@ -448,8 +485,7 @@ class PoiModel {
                 return [CAT_MUSEUM, t];
             }
         }
-        var a = tags["amenity"];
-        if (a instanceof String) {
+        if (a.length() > 0) {
             if (a.equals("restaurant")) { return [CAT_RESTAURANT, a]; }
             if (a.equals("cafe") || a.equals("fast_food")
                 || a.equals("ice_cream")) {

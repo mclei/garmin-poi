@@ -33,14 +33,16 @@ any modern Connect IQ device you add to the manifest.
     and ground track
 
   Defaults on: Monuments, Castles, Ruins, Viewpoints, Restaurants, Museums.
-  Food categories are capped at a 2 km radius regardless of the search radius.
-- Search radius configurable 0.5–10 km (default 5 km).
+- **Range** — land POIs use an *expanding search*: it starts at 200 m and
+  widens (500 m → 1 → 2 → 5 km) only until something is found, so in a city
+  you get the things right around you and in open country it reaches out to
+  the nearest POI up to 5 km. Aircraft use the configured radius (default 5 km).
 
 ## Data sources (free, no API keys)
 
 | Data | Source | Notes |
 |------|--------|-------|
-| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Public servers, fair-use. The app fetches at most every 60 s and only after you move >400 m. It rotates across several mirrors (`overpass-api.de`, `overpass.osm.ch`, `kumi.systems`, `private.coffee`) and retries on the next one if a request fails — the main instance intermittently returns a 406 page that can't be parsed. |
+| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Public `overpass-api.de`, fair-use: fetched at most every ~60 s and after moving >400 m. The query asks for **CSV** with only the fields used (name, coordinates, type) so the response stays small enough to parse on-watch — full JSON is far too large in dense areas. The public instance is sometimes flaky (intermittent 406/504); transient failures are retried. To use a different instance, change `OVERPASS_URL` in `source/PoiModel.mc`. |
 | Aircraft | [OpenSky Network](https://opensky-network.org) | Anonymous access has a daily request budget (~400 credits/day, 1–4 per call). Default refresh is 30 s; raise it in settings if you watch planes for hours. |
 
 Requests go through the **paired phone** (Garmin Connect Mobile must be
@@ -130,9 +132,9 @@ The launcher icon can be regenerated with `python3 scripts/make_icon.py`.
 ## Settings
 
 Via Garmin Connect Mobile (or Connect IQ Store app) → POI Finder →
-Settings: search radius, max places, category toggles, aircraft refresh
-interval. Category toggles changed on the watch are persisted and synced
-back.
+Settings: aircraft radius, max places, category toggles, aircraft refresh
+interval. (Land POIs auto-expand 200 m→5 km and need no radius setting.)
+Category toggles changed on the watch are persisted and synced back.
 
 ## CI (GitHub Actions)
 
@@ -164,10 +166,9 @@ and push — the workflow runs automatically.
 | Symptom | Cause |
 |---------|-------|
 | `POI err -104` | Watch not connected to the phone / no internet |
-| `POI err -400` | A mirror returned a non-JSON page (e.g. overpass-api.de's intermittent 406). The app rotates to another mirror and retries within ~8 s; transient. |
-| `POI err 429` / `504` | Overpass server busy — rotates to another mirror and retries (~8 s) |
+| `POI err 406` / `504` / `429` | The public `overpass-api.de` instance is flaky or busy; retried automatically every ~8 s. Persistent failures mean the instance is down — try later, or point `OVERPASS_URL` at another instance. |
 | `air err 429` | OpenSky anonymous daily budget exhausted |
-| `POI err -402` | Response too large — reduce radius or max places |
+| `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
 | Compass frozen | Calibrate compass (figure-8 motion); Venu X1 has a magnetometer |
 
 ## Adding more devices
