@@ -1,8 +1,7 @@
 import Toybox.Lang;
 
-// POI categories. Indices 0..NUM_LAND_CATS-1 are fetched from OpenStreetMap
-// via Overpass; CAT_AIRCRAFT comes from OpenSky. The order here must match
-// the parallel arrays in module PoiCat and the defaults in PoiModel.
+// POI categories, all fetched from OpenStreetMap via Overpass. The order here
+// must match the parallel arrays in module PoiCat and the defaults in PoiModel.
 const CAT_MONUMENT   = 0;  // historic catch-all: monuments, memorials, other historic
 const CAT_CASTLE     = 1;  // castles, forts, city gates, palaces
 const CAT_RUINS      = 2;  // ruins, archaeological sites
@@ -13,30 +12,25 @@ const CAT_BAR        = 6;  // bar, pub, biergarten
 const CAT_MUSEUM     = 7;  // museum, gallery, artwork
 const CAT_THEATRE    = 8;  // theatre, cinema, arts centre
 const CAT_WORSHIP    = 9;  // places of worship
-const CAT_AIRCRAFT   = 10; // live air traffic (OpenSky)
-const NUM_CATS = 11;
-const NUM_LAND_CATS = 10;  // categories fetched from Overpass
+const NUM_CATS = 10;
+const NUM_LAND_CATS = 10;
 
 // Fetch status
 const STATUS_IDLE = 0;
 const STATUS_LOADING = 1;
 const STATUS_ERROR = 2;
 
-// A single point of interest (or aircraft)
+// A single point of interest.
 class Poi {
     public var name as String;
     public var lat as Double;       // degrees
     public var lon as Double;       // degrees
     public var category as Number;  // CAT_*
-    public var detail as String;    // subtype ("Castle") or aircraft altitude/speed
+    public var detail as String;    // subtype, e.g. "Castle"
     public var distance as Float;   // meters from current position
     public var bearing as Float;    // degrees true, 0..360
-    public var track as Float?;     // aircraft ground track, degrees true
-    public var icao24 as String;    // aircraft Mode-S address (key for type lookup)
     public var osmType as String;   // "node"/"way"/"relation" (for detail fetch)
     public var osmId as String;     // OSM element id (for detail fetch)
-    public var altM as Number;      // aircraft altitude in metres, -1 if unknown
-    public var speedKmh as Number;  // aircraft ground speed in km/h, -1 if unknown
     public var inView as Boolean;   // currently inside the field-of-view cone (hysteresis)
 
     function initialize(aName as String, aLat as Double, aLon as Double,
@@ -48,12 +42,8 @@ class Poi {
         detail = aDetail;
         distance = 0.0;
         bearing = 0.0;
-        track = null;
-        icao24 = "";
         osmType = "";
         osmId = "";
-        altM = -1;
-        speedKmh = -1;
         inView = false;
     }
 }
@@ -72,25 +62,24 @@ module PoiCat {
         0x00CC88, // bar       - teal
         0xFF66CC, // museum    - pink
         0xCC66FF, // theatre   - purple
-        0xFF99AA, // worship   - rose
-        0x00FFFF  // aircraft  - cyan
+        0xFF99AA  // worship   - rose
     ] as Array<Number>;
 
     const SHORT = [
         "mon", "cstl", "ruin", "view", "rest", "cafe",
-        "bar", "mus", "thtr", "wrsp", "air"
+        "bar", "mus", "thtr", "wrsp"
     ] as Array<String>;
 
     const KEYS = [
         "catMonument", "catCastle", "catRuins", "catViewpoint",
         "catRestaurant", "catCafe", "catBar", "catMuseum",
-        "catTheatre", "catWorship", "catAircraft"
+        "catTheatre", "catWorship"
     ] as Array<String>;
 
     // default on/off state when no stored property exists
     const DEFAULTS = [
         true, true, true, true, true, false,
-        false, true, false, false, false
+        false, true, false, false
     ] as Array<Boolean>;
 
     function color(cat as Number) as Number { return COLORS[cat]; }
@@ -105,8 +94,7 @@ module PoiCat {
             Rez.Strings.CatRuins, Rez.Strings.CatViewpoint,
             Rez.Strings.CatRestaurant, Rez.Strings.CatCafe,
             Rez.Strings.CatBar, Rez.Strings.CatMuseum,
-            Rez.Strings.CatTheatre, Rez.Strings.CatWorship,
-            Rez.Strings.CatAircraft
+            Rez.Strings.CatTheatre, Rez.Strings.CatWorship
         ];
         return ids[cat];
     }

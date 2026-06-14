@@ -35,19 +35,8 @@ class DetailView extends WatchUi.View {
     }
 
     function onTick() as Void {
-        var done = false;
-        if (_poi.category == CAT_AIRCRAFT) {
-            _model.resolveAircraftFor(_poi);
-            var typeDone = (_poi.icao24.length() == 0)
-                         || (_model.aircraftType(_poi.icao24) != null);
-            var routeDone = (_poi.name.length() == 0)
-                          || (_model.aircraftRoute(_poi.name) != null);
-            done = typeDone && routeDone;
-        } else {
-            _model.requestPoiDetail(_poi);
-            done = (_model.poiDetail(_poi) != null);
-        }
-        if (done) {
+        _model.requestPoiDetail(_poi);
+        if (_model.poiDetail(_poi) != null) {
             var t = _timer;
             if (t != null) { t.stop(); _timer = null; }
         }
@@ -126,11 +115,7 @@ class DetailView extends WatchUi.View {
     // Build display blocks: each is [text, font, color].
     private function buildBlocks() as Array {
         var b = [] as Array;
-        if (_poi.category == CAT_AIRCRAFT) {
-            buildAircraftBlocks(b);
-        } else {
-            buildPoiBlocks(b);
-        }
+        buildPoiBlocks(b);
         // common footer
         b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
         var locked = (_model.targetPoi == _poi) ? "locked" : "not locked";
@@ -178,46 +163,6 @@ class DetailView extends WatchUi.View {
                Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
     }
 
-    private function buildAircraftBlocks(b as Array) as Void {
-        b.add([_poi.name, Graphics.FONT_MEDIUM, Graphics.COLOR_WHITE]);
-
-        var fr = _model.flightInfo(_poi.name);
-        if (fr != null) {
-            addField(b, "From", airportLine(fr["origin"]));
-            addField(b, "To", airportLine(fr["destination"]));
-        } else if (_poi.name.length() == 0) {
-            b.add(["No callsign", Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
-        } else if (_model.aircraftRoute(_poi.name) == null) {
-            b.add(["Resolving route...", Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
-        } else {
-            b.add(["Route unknown", Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
-        }
-        b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
-
-        var ac = _model.aircraftInfo(_poi.icao24);
-        if (ac != null) {
-            var type = tagStr(ac, "type");
-            var manuf = tagStr(ac, "manufacturer");
-            if (manuf.length() > 0) { type = manuf + " " + type; }
-            addField(b, "Type", type);
-            addField(b, "ICAO type", tagStr(ac, "icao_type"));
-            addField(b, "Operator", tagStr(ac, "registered_owner"));
-            addField(b, "Reg.", tagStr(ac, "registration"));
-            addField(b, "Country", tagStr(ac, "registered_owner_country_name"));
-        } else if (_poi.icao24.length() > 0
-                   && _model.aircraftType(_poi.icao24) == null) {
-            b.add(["Resolving type...", Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
-        }
-        b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
-
-        addField(b, "Now", _poi.detail);   // altitude, speed
-        if (_poi.track != null) {
-            addField(b, "Heading", (_poi.track as Float).toNumber().toString() + " deg");
-        }
-        addField(b, "Distance", GeoUtils.formatDistance(_poi.distance) + " "
-                 + GeoUtils.cardinal(_poi.bearing));
-    }
-
     private function addField(b as Array, label as String, value as String) as Void {
         if (value == null || value.length() == 0) { return; }
         var text = (label.length() > 0) ? (label + ": " + value) : value;
@@ -241,18 +186,6 @@ class DetailView extends WatchUi.View {
         if (city.length() > 0) {
             if (s.length() > 0) { s += ", "; }
             s += city;
-        }
-        return s;
-    }
-
-    private function airportLine(ap) as String {
-        if (!(ap instanceof Dictionary)) { return ""; }
-        var city = tagStr(ap, "municipality");
-        var iata = tagStr(ap, "iata_code");
-        var name = tagStr(ap, "name");
-        var s = (city.length() > 0) ? city : name;
-        if (iata.length() > 0) {
-            s = (s.length() > 0) ? (s + " (" + iata + ")") : iata;
         }
         return s;
     }

@@ -35,12 +35,8 @@ module PoiUi {
         for (var i = 0; i < n; i++) {
             var p = vis[i];
             var sub = GeoUtils.formatDistance(p.distance)
-                    + " " + GeoUtils.cardinal(p.bearing);
-            if (p.category == CAT_AIRCRAFT && p.altM >= 0) {
-                sub += " | " + p.altM.toString() + " m";   // distinguish planes
-            } else {
-                sub += " | " + PoiCat.shortName(p.category);
-            }
+                    + " " + GeoUtils.cardinal(p.bearing)
+                    + " | " + PoiCat.shortName(p.category);
             menu.addItem(new WatchUi.MenuItem(p.name, sub, i, null));
         }
         WatchUi.pushView(menu, new PoiListDelegate(model, vis), WatchUi.SLIDE_LEFT);

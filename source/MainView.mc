@@ -115,7 +115,7 @@ class MainView extends WatchUi.View {
         // draw farthest first so near dots end up on top
         for (var i = n - 1; i >= 0; i--) {
             var p = vis[i];
-            var rr = p.distance / _model.radiusM.toFloat();
+            var rr = p.distance / POI_RANGE;
             if (rr > 1.0) { rr = 1.0; }
             rr = Math.sqrt(rr).toFloat();
             var rpx = (ring - 28) * rr;
@@ -123,13 +123,7 @@ class MainView extends WatchUi.View {
             var x = cx + rpx * Math.sin(a);
             var y = cy - rpx * Math.cos(a);
             dc.setColor(PoiCat.color(p.category), Graphics.COLOR_TRANSPARENT);
-            if (p.category == CAT_AIRCRAFT) {
-                var tr = (p.track != null) ? p.track as Float : 0.0;
-                drawTriangle(dc, x.toFloat(), y.toFloat(),
-                             GeoUtils.normDeg(tr - hdg), 9.0);
-            } else {
-                dc.fillCircle(x.toNumber(), y.toNumber(), 4);
-            }
+            dc.fillCircle(x.toNumber(), y.toNumber(), 4);
         }
     }
 
@@ -158,11 +152,7 @@ class MainView extends WatchUi.View {
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        if (f.category == CAT_AIRCRAFT) {
-            drawFocusedAircraft(dc, cx, cy, ring, f);
-        } else {
-            drawFocusedPoi(dc, cx, cy, ring, f);
-        }
+        drawFocusedPoi(dc, cx, cy, ring, f);
     }
 
     private function drawFocusedPoi(dc as Dc, cx as Number, cy as Number,
@@ -189,59 +179,6 @@ class MainView extends WatchUi.View {
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    // Aircraft: destination and type are the headline (resolved from adsbdb);
-    // callsign, distance and altitude are secondary.
-    private function drawFocusedAircraft(dc as Dc, cx as Number, cy as Number,
-                                         ring as Number, f as Poi) as Void {
-        var maxW = (ring * 1.8).toNumber();
-        var route = _model.aircraftRoute(f.name);  // null=loading, ""=unknown
-        var type = _model.aircraftType(f.icao24);
-
-        // The four key fields, evenly stacked: callsign, destination,
-        // altitude, type. Speed + distance are secondary (smallest).
-
-        // callsign (flight id)
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - (ring * 0.30).toNumber(), Graphics.FONT_TINY,
-                    fitText(dc, f.name, Graphics.FONT_TINY, maxW),
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // destination / route
-        var routeText = (route == null) ? "resolving..."
-                      : (route.length() == 0 ? "route n/a" : route);
-        dc.setColor(0x00FFFF, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - (ring * 0.13).toNumber(), Graphics.FONT_SMALL,
-                    fitText(dc, routeText, Graphics.FONT_SMALL, maxW),
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // altitude (same size as the route line)
-        var altText = (f.altM >= 0) ? (f.altM.toString() + " m") : "alt ?";
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy + (ring * 0.04).toNumber(), Graphics.FONT_SMALL,
-                    altText,
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // aircraft type + operator
-        var typeText = (type == null) ? ""
-                     : (type.length() == 0 ? "type n/a" : type);
-        if (typeText.length() > 0) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy + (ring * 0.20).toNumber(), Graphics.FONT_TINY,
-                        fitText(dc, typeText, Graphics.FONT_TINY, maxW),
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        }
-
-        // speed + distance (secondary)
-        var line = "";
-        if (f.speedKmh >= 0) { line += f.speedKmh.toString() + " km/h"; }
-        if (line.length() > 0) { line += "  "; }
-        line += GeoUtils.formatDistance(f.distance);
-        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy + (ring * 0.34).toNumber(), Graphics.FONT_XTINY,
-                    fitText(dc, line, Graphics.FONT_XTINY, maxW),
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-    }
-
     private function drawStatus(dc as Dc, cx as Number, cy as Number,
                                 ring as Number, w as Number, h as Number) as Void {
         var hdg = _model.headingDeg;
@@ -259,13 +196,6 @@ class MainView extends WatchUi.View {
             s += "POI err " + _model.poiError.toString();
         } else {
             s += _model.visible.size().toString() + " POI";
-        }
-        if (_model.effectiveCatEnabled(CAT_AIRCRAFT)) {
-            if (_model.airStatus == STATUS_ERROR) {
-                s += " | air err " + _model.airError.toString();
-            } else {
-                s += " | " + _model.aircraft.size().toString() + " air";
-            }
         }
         // square display: use the margin below the ring if there is one
         var bottomMargin = h - (cy + ring);

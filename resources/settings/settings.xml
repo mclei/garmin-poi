@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <settings>
-    <setting propertyKey="@Properties.radiusMeters" title="@Strings.SetRadius">
-        <settingConfig type="numeric" min="500" max="10000"/>
-    </setting>
     <setting propertyKey="@Properties.maxPois" title="@Strings.SetMaxPois">
         <settingConfig type="numeric" min="10" max="100"/>
     </setting>
@@ -36,12 +33,5 @@
     </setting>
     <setting propertyKey="@Properties.catWorship" title="@Strings.CatWorship">
         <settingConfig type="boolean"/>
-    </setting>
-    <setting propertyKey="@Properties.catAircraft" title="@Strings.CatAircraft">
-        <settingConfig type="boolean"/>
-    </setting>
-
-    <setting propertyKey="@Properties.aircraftRefreshSec" title="@Strings.SetAirRefresh">
-        <settingConfig type="numeric" min="15" max="120"/>
     </setting>
 </settings>

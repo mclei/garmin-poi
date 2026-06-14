@@ -29,24 +29,18 @@ any modern Connect IQ device you add to the manifest.
   - Museums & galleries — `tourism=museum/gallery/artwork`
   - Theatres & cinemas — `amenity=theatre/cinema/arts_centre`
   - Places of worship — `amenity=place_of_worship`
-  - Aircraft (live) — overhead air traffic. When you point at one, the main
-    screen shows its **destination** and **aircraft type** (e.g. "FRA → SAW
-    Istanbul" / "Airbus A321 - Pegasus"), plus callsign, distance, altitude
-    and speed. Type and route are looked up on demand for the focused plane.
 
   Defaults on: Monuments, Castles, Ruins, Viewpoints, Restaurants, Museums.
-- **Field of view** — land POIs are shown only when they're roughly in front
+- **Field of view** — POIs are shown only when they're roughly in front
   of you (within ~45° of your heading, ~90° total). As you turn, the set
   re-filters live from the already-loaded data (no refetch), with hysteresis so
-  POIs near the edge don't flicker. Aircraft ignore this and are always shown
-  in all directions.
-- **Range** — land POIs use an *expanding search* that widens only until
-  something is found (up to 5 km). The starting radius tracks GPS precision:
-  **50 m** on a good fix, ~200 m on a usable one, ~500 m while the position is
-  still approximate — so a precise fix in a city shows exactly what's right in
-  front of you. The query uses Overpass `convert` to return only the fields it
-  needs, keeping the response small enough to parse on-watch. Aircraft use the
-  configured radius (default 10 km).
+  POIs near the edge don't flicker.
+- **Range** — an *expanding search* that widens only until something is found
+  (up to 5 km). The starting radius tracks GPS precision: **50 m** on a good
+  fix, ~200 m on a usable one, ~500 m while the position is still approximate —
+  so a precise fix in a city shows exactly what's right in front of you. The
+  query uses Overpass `convert` to return only the fields it needs, keeping the
+  response small enough to parse on-watch.
 - **Fast start** — on launch the app seeds from the cached last-known position
   so POIs load immediately while the GPS warms up. The status line shows a
   leading `~` until a precise fix arrives, then the list is refined to it.
@@ -56,8 +50,6 @@ any modern Connect IQ device you add to the manifest.
 | Data | Source | Notes |
 |------|--------|-------|
 | Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Tries `maps.mail.ru` first (it answered 100% reliably in testing), failing over to `overpass-api.de` (whose public instance 406s ~half its requests, so it's only a fallback). **Note:** mail.ru is Russian infrastructure and receives your search coordinates — reorder `OVERPASS_MIRRORS` in `source/PoiModel.mc` (e.g. put `overpass-api.de` or a self-hosted instance first) if you'd rather not use it. The query uses Overpass `convert` to project only the needed fields → compact `application/json` (CSV would be smaller but the watch rejects `text/csv`). Fetched at most every ~60 s and after moving >400 m. |
-| Aircraft positions | [OpenSky Network](https://opensky-network.org) | Anonymous access has a daily request budget (~400 credits/day, 1–4 per call). Default refresh is 30 s; raise it in settings if you watch planes for hours. |
-| Aircraft type & route | [adsbdb.com](https://www.adsbdb.com) | Free, keyless. OpenSky has no type/destination, so the **focused** aircraft's type (by Mode-S address) and route (by callsign) are fetched here and cached. Only the focused plane is looked up, so volume stays low. |
 
 Requests go through the **paired phone** (Garmin Connect Mobile must be
 running with internet access). Without the phone you'll see error `-104`.
@@ -71,7 +63,7 @@ resources/              strings, properties, settings UI, launcher icon
 scripts/make_icon.py    regenerates the launcher icon (stdlib-only Python)
 source/
   PoiFinderApp.mc       app entry point
-  PoiModel.mc           GPS, compass, Overpass + OpenSky fetching, state
+  PoiModel.mc           GPS, compass, Overpass fetching, state
   Poi.mc                POI class, categories
   GeoUtils.mc           distance/bearing math, formatting
   MainView.mc           compass/radar screen
@@ -129,9 +121,9 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 
 | Input | Action |
 |-------|--------|
-| **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: full description/tags for places, type + route for aircraft) |
+| **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: full description, address, hours, website, …) |
 | **Swipe in from the right edge** | Filters menu (settings) — category toggles + "Refresh now" |
-| **Swipe down** | Quick "show only one category" — a one-shot (e.g. just restaurants, or just aircraft) that does **not** change your saved filters; the next normal search reverts to them |
+| **Swipe down** | Quick "show only one category" — a one-shot (e.g. just restaurants, or just museums) that does **not** change your saved filters; the next normal search reverts to them |
 | Swipe up | Nearest-POI list; select an entry opens its detail page |
 | Long-press screen | Filters menu (only where the firmware emits it) |
 | Back | Exit |
@@ -143,17 +135,17 @@ On a sideloaded build the phone settings are unavailable, so the **Filters
 menu is where you turn POI categories on and off** — open it with the Start
 button or a right-edge swipe.
 
-Status line at the bottom: current heading, POI count (or load/error
-state), aircraft count when the aircraft category is enabled.
+Status line at the bottom: current heading and POI count (or load/error
+state).
 
 The launcher icon can be regenerated with `python3 scripts/make_icon.py`.
 
 ## Settings
 
 Via Garmin Connect Mobile (or Connect IQ Store app) → POI Finder →
-Settings: aircraft radius, max places, category toggles, aircraft refresh
-interval. (Land POIs auto-expand 200 m→5 km and need no radius setting.)
-Category toggles changed on the watch are persisted and synced back.
+Settings: max places and the category toggles. (POIs auto-expand 200 m→5 km
+and need no radius setting.) Category toggles changed on the watch are
+persisted and synced back.
 
 ## CI (GitHub Actions)
 
@@ -185,8 +177,7 @@ and push — the workflow runs automatically.
 | Symptom | Cause |
 |---------|-------|
 | `POI err -104` | Watch not connected to the phone / no internet |
-| `POI err 406` / `-400` / `504` / `429` | A mirror failed (overpass-api.de 406s a lot, which surfaces as -400). The app fails over to the next mirror and retries every ~8 s; usually transient. |
-| `air err 429` | OpenSky anonymous daily budget exhausted |
+| `POI err 406` / `-400` / `504` / `429` | A mirror failed (overpass-api.de 406s a lot, which surfaces as -400). The app fails over to the next mirror and retries; usually transient. |
 | `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
 | Compass frozen | Calibrate compass (figure-8 motion); Venu X1 has a magnetometer |
 
@@ -195,3 +186,9 @@ and push — the workflow runs automatically.
 Add product ids to `manifest.xml` (e.g. `<iq:product id="venu3"/>`) and
 download the matching device files in the SDK Manager. All drawing is
 resolution-independent, so round displays work too.
+
+## Sister app
+
+Live aircraft tracking (what plane is that overhead?) used to live here too,
+but moved to a dedicated app, **[Planes Above Me](../garmin-planesaboveme)** —
+this app is POIs-on-the-ground only.

@@ -16,13 +16,6 @@ const OVERPASS_MIRRORS = [
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     "https://overpass-api.de/api/interpreter"
 ] as Array<String>;
-const OPENSKY_URL = "https://opensky-network.org/api/states/all";
-
-// OpenSky has no aircraft type or destination, so the focused aircraft's type
-// (by Mode-S address) and route (by callsign) are resolved on demand from the
-// free, keyless adsbdb.com and cached. Only the focused aircraft is looked up.
-const ADSBDB_AIRCRAFT_URL = "https://api.adsbdb.com/v0/aircraft/";
-const ADSBDB_CALLSIGN_URL = "https://api.adsbdb.com/v0/callsign/";
 
 // Land POIs use an expanding search: start tight and widen only when nothing
 // is found, up to 5 km. The starting radius depends on GPS precision (50 m on
@@ -41,11 +34,12 @@ const POI_MAX_ELEMENTS = 60;
 // Field of view for land POIs: only those whose bearing is within FOV_ENTER of
 // the current heading are shown ("what you're looking at", ~90 deg total). Once
 // shown, a POI stays until it passes FOV_EXIT - the hysteresis stops it from
-// flickering on/off as you turn near the edge. Aircraft ignore this (full 360).
+// flickering on/off as you turn near the edge.
 const FOV_ENTER = 45.0;
 const FOV_EXIT = 55.0;
 
-const MAX_AIRCRAFT = 25;
+// Range used to scale the radar dots (matches the widest expanding radius).
+const POI_RANGE = 5000.0;
 
 // Central application state: position, heading, POI data and fetch logic.
 class PoiModel {
@@ -59,27 +53,20 @@ class PoiModel {
 
     // Data
     public var pois as Array<Poi>;       // land POIs, distance-sorted
-    public var aircraft as Array<Poi>;
-    public var visible as Array<Poi>;    // filtered union, distance-sorted
+    public var visible as Array<Poi>;    // field-of-view filtered, distance-sorted
     public var targetPoi as Poi?;        // user-locked target
 
     // Status
     public var poiStatus as Number;
     public var poiError as Number;
-    public var airStatus as Number;
-    public var airError as Number;
 
     // Settings
-    public var radiusM as Number;
     public var maxPois as Number;
-    public var airRefreshSec as Number;
     public var catEnabled as Array<Boolean>;
 
     private var _fetchPending as Boolean;
-    private var _airPending as Boolean;
     private var _needPoiFetch as Boolean;
     private var _lastPoiAttemptSec as Number;
-    private var _lastAirAttemptSec as Number;
     private var _fetchLat as Double?;
     private var _fetchLon as Double?;
     private var _fetchedMask as Number;  // land categories included in last fetch
@@ -89,16 +76,6 @@ class PoiModel {
     private var _oneShotCat as Number;   // temporary "show only this" category, -1 = off
     private var _oneShotPending as Boolean;
     private var _dirty as Boolean;
-
-    // Aircraft detail caches (resolved lazily from adsbdb for the focused plane)
-    private var _acType as Dictionary;   // icao24 -> type label ("" = unknown)
-    private var _acRoute as Dictionary;  // callsign -> route label ("" = unknown)
-    private var _acInfo as Dictionary;   // icao24 -> raw aircraft fields dict
-    private var _acRouteInfo as Dictionary; // callsign -> raw flightroute dict
-    private var _metaPending as Boolean;
-    private var _lastMetaSec as Number;
-    private var _metaTypeKey as String?;   // icao24 of in-flight type request
-    private var _metaRouteKey as String?;  // callsign of in-flight route request
 
     // Full-tag cache for the POI detail page (key "type/id" -> tags dict;
     // "" cached on failure). Fetched on demand when a detail page opens.
@@ -114,25 +91,18 @@ class PoiModel {
         posApprox = false;
         headingDeg = 0.0;
         pois = [] as Array<Poi>;
-        aircraft = [] as Array<Poi>;
         visible = [] as Array<Poi>;
         targetPoi = null;
         poiStatus = STATUS_IDLE;
         poiError = 0;
-        airStatus = STATUS_IDLE;
-        airError = 0;
-        radiusM = 10000;   // aircraft search radius (10 km)
         maxPois = 40;
-        airRefreshSec = 30;
         catEnabled = new Array<Boolean>[NUM_CATS];
         for (var c = 0; c < NUM_CATS; c++) {
             catEnabled[c] = PoiCat.defaultEnabled(c);
         }
         _fetchPending = false;
-        _airPending = false;
         _needPoiFetch = false;
         _lastPoiAttemptSec = 0;
-        _lastAirAttemptSec = 0;
         _fetchLat = null;
         _fetchLon = null;
         _fetchedMask = 0;
@@ -142,14 +112,6 @@ class PoiModel {
         _oneShotCat = -1;
         _oneShotPending = false;
         _dirty = true;
-        _acType = {} as Dictionary;
-        _acRoute = {} as Dictionary;
-        _acInfo = {} as Dictionary;
-        _acRouteInfo = {} as Dictionary;
-        _metaPending = false;
-        _lastMetaSec = 0;
-        _metaTypeKey = null;
-        _metaRouteKey = null;
         _poiDetail = {} as Dictionary;
         _detailPending = false;
         _detailKey = null;
@@ -183,14 +145,9 @@ class PoiModel {
     // ---- settings ----
 
     function reloadSettings() as Void {
-        radiusM = getNumProp("radiusMeters", 10000);
-        if (radiusM < 500) { radiusM = 500; }
-        if (radiusM > 10000) { radiusM = 10000; }
         maxPois = getNumProp("maxPois", 40);
         if (maxPois < 10) { maxPois = 10; }
         if (maxPois > 100) { maxPois = 100; }
-        airRefreshSec = getNumProp("aircraftRefreshSec", 30);
-        if (airRefreshSec < 15) { airRefreshSec = 15; }
         var arr = new Array<Boolean>[NUM_CATS];
         for (var c = 0; c < NUM_CATS; c++) {
             arr[c] = getBoolProp(PoiCat.propKey(c), PoiCat.defaultEnabled(c));
@@ -220,7 +177,6 @@ class PoiModel {
     function forceRefresh() as Void {
         _needPoiFetch = true;
         _lastPoiAttemptSec = 0;
-        _lastAirAttemptSec = 0;
     }
 
     // Whether a category is active for the current search/display: while a
@@ -246,12 +202,8 @@ class PoiModel {
         _needPoiFetch = false;
         if (lat != null) { _fetchLat = lat; _fetchLon = lon; }
         _lastPoiAttemptSec = Time.now().value();
-        if (cat < NUM_LAND_CATS) {
-            pois = [] as Array<Poi>;    // drop stale data of other categories
-            _oneShotPending = true;     // trigger a land fetch for just this cat
-        } else {
-            _lastAirAttemptSec = 0;     // aircraft: force an immediate refresh
-        }
+        pois = [] as Array<Poi>;    // drop stale data of other categories
+        _oneShotPending = true;     // trigger a fetch for just this category
     }
 
     function clearOneShot() as Void {
@@ -309,11 +261,9 @@ class PoiModel {
         if (lat == null) { return; }
         var now = Time.now().value();
         maybeFetchPois(now);
-        maybeFetchAircraft(now);
         // Rebuilt every tick so the field-of-view filter tracks the heading as
         // you turn (re-filters the already-loaded POIs, no refetch).
         rebuildVisible();
-        maybeResolveAircraft(now);
     }
 
     // ---- visible set / focus ----
@@ -324,11 +274,6 @@ class PoiModel {
         var lo = lon as Double;
         for (var i = 0; i < pois.size(); i++) {
             var p = pois[i];
-            p.distance = GeoUtils.distanceM(la, lo, p.lat, p.lon);
-            p.bearing = GeoUtils.bearingDeg(la, lo, p.lat, p.lon);
-        }
-        for (var i = 0; i < aircraft.size(); i++) {
-            var p = aircraft[i];
             p.distance = GeoUtils.distanceM(la, lo, p.lat, p.lon);
             p.bearing = GeoUtils.bearingDeg(la, lo, p.lat, p.lon);
         }
@@ -357,12 +302,6 @@ class PoiModel {
             var limit = p.inView ? FOV_EXIT : FOV_ENTER;
             p.inView = (d <= limit);
             if (p.inView) { out.add(p); }
-        }
-        // Aircraft: always shown, full 360 deg (no field-of-view filter).
-        if (effectiveCatEnabled(CAT_AIRCRAFT)) {
-            for (var i = 0; i < aircraft.size(); i++) {
-                out.add(aircraft[i]);
-            }
         }
         GeoUtils.sortByDistance(out);
         visible = out;
@@ -404,7 +343,7 @@ class PoiModel {
     // ---- Overpass (OpenStreetMap POIs) ----
 
     private function maybeFetchPois(now as Number) as Void {
-        if (_fetchPending || _airPending) { return; }
+        if (_fetchPending) { return; }
         // One-shot land search just requested: fetch it without clearing the
         // override (so following normal searches can revert it).
         if (_oneShotPending && _oneShotCat >= 0 && _oneShotCat < NUM_LAND_CATS) {
@@ -695,155 +634,6 @@ class PoiModel {
         return out;
     }
 
-    // ---- OpenSky (live aircraft) ----
-
-    private function maybeFetchAircraft(now as Number) as Void {
-        if (_fetchPending || _airPending) { return; }
-        if (!effectiveCatEnabled(CAT_AIRCRAFT)) {
-            if (aircraft.size() > 0) {
-                aircraft = [] as Array<Poi>;
-                _dirty = true;
-            }
-            return;
-        }
-        if (now - _lastAirAttemptSec < airRefreshSec) { return; }
-        fetchAircraft(now);
-    }
-
-    private function fetchAircraft(now as Number) as Void {
-        _airPending = true;
-        airStatus = STATUS_LOADING;
-        _lastAirAttemptSec = now;
-        var la = lat as Double;
-        var lo = lon as Double;
-        var dLat = radiusM / 111320.0;
-        var cosLat = Math.cos(Math.toRadians(la));
-        if (cosLat < 0.05) { cosLat = 0.05; }
-        var dLon = radiusM / (111320.0 * cosLat);
-        var params = {
-            "lamin" => (la - dLat).format("%.4f"),
-            "lomin" => (lo - dLon).format("%.4f"),
-            "lamax" => (la + dLat).format("%.4f"),
-            "lomax" => (lo + dLon).format("%.4f")
-        };
-        var options = {
-            :method => Communications.HTTP_REQUEST_METHOD_GET,
-            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
-        };
-        Communications.makeWebRequest(OPENSKY_URL, params, options,
-                                      method(:onAirResponse));
-    }
-
-    function onAirResponse(code as Number, data as Dictionary or String or Null) as Void {
-        _airPending = false;
-        if (code == 200 && data instanceof Dictionary) {
-            var fresh = [] as Array<Poi>;
-            var states = data["states"];
-            if (states instanceof Array) {
-                for (var i = 0; i < states.size(); i++) {
-                    if (fresh.size() >= MAX_AIRCRAFT) { break; }
-                    var s = states[i];
-                    if (!(s instanceof Array) || s.size() < 11) { continue; }
-                    // OpenSky state vector: 1=callsign, 5=lon, 6=lat,
-                    // 7=baro alt (m), 8=on_ground, 9=velocity (m/s), 10=track
-                    if (s[8] == true) { continue; }
-                    var plat = numToD(s[6]);
-                    var plon = numToD(s[5]);
-                    if (plat == null || plon == null) { continue; }
-                    var name = "Aircraft";
-                    var cs = s[1];
-                    if (cs instanceof String) {
-                        var trimmed = trim(cs);
-                        if (trimmed.length() > 0) { name = trimmed; }
-                    }
-                    var detail = "";
-                    var alt = numToD(s[7]);
-                    if (alt != null) {
-                        detail += alt.toNumber().toString() + " m";
-                    }
-                    var vel = numToD(s[9]);
-                    if (vel != null) {
-                        if (detail.length() > 0) { detail += ", "; }
-                        detail += (vel * 3.6).toNumber().toString() + " km/h";
-                    }
-                    var p = new Poi(name, plat, plon, CAT_AIRCRAFT, detail);
-                    var tr = numToD(s[10]);
-                    if (tr != null) { p.track = tr.toFloat(); }
-                    if (alt != null) { p.altM = alt.toNumber(); }
-                    if (vel != null) { p.speedKmh = (vel * 3.6).toNumber(); }
-                    var icao = s[0];
-                    if (icao instanceof String) { p.icao24 = trim(icao); }
-                    fresh.add(p);
-                }
-            }
-            aircraft = fresh;
-            airStatus = STATUS_IDLE;
-            airError = 0;
-            updateDerived();
-        } else {
-            airStatus = STATUS_ERROR;
-            airError = code;
-        }
-        WatchUi.requestUpdate();
-    }
-
-    // ---- aircraft type/route resolution (adsbdb) ----
-
-    // Resolved labels for the focused aircraft; null = not looked up yet,
-    // "" = looked up but unknown, otherwise a display string.
-    function aircraftType(icao24 as String) as String? {
-        if (icao24.length() == 0) { return null; }
-        return _acType.get(icao24);
-    }
-
-    function aircraftRoute(callsign as String) as String? {
-        if (callsign.length() == 0) { return null; }
-        return _acRoute.get(callsign);
-    }
-
-    private function maybeResolveAircraft(now as Number) as Void {
-        if (!effectiveCatEnabled(CAT_AIRCRAFT)) { return; }
-        var f = focusedPoi();
-        if (f == null || f.category != CAT_AIRCRAFT) { return; }
-        resolveAircraftFor(f);
-    }
-
-    // Resolve type/route for a specific aircraft. Public so the detail page
-    // (where the main view's timer is paused) can keep it progressing.
-    function resolveAircraftFor(f as Poi) as Void {
-        if (_metaPending || _fetchPending || _airPending) { return; }
-        var now = Time.now().value();
-        if (now - _lastMetaSec < 2) { return; }
-        // One lookup per call: type first (by Mode-S), then route (by callsign).
-        if (f.icao24.length() > 0 && _acType.get(f.icao24) == null) {
-            _metaPending = true;
-            _lastMetaSec = now;
-            _metaTypeKey = f.icao24;
-            Communications.makeWebRequest(ADSBDB_AIRCRAFT_URL + f.icao24, {},
-                                          metaOptions(), method(:onTypeResponse));
-            return;
-        }
-        if (f.name.length() > 0 && _acRoute.get(f.name) == null) {
-            _metaPending = true;
-            _lastMetaSec = now;
-            _metaRouteKey = f.name;
-            Communications.makeWebRequest(ADSBDB_CALLSIGN_URL + f.name, {},
-                                          metaOptions(), method(:onRouteResponse));
-        }
-    }
-
-    function aircraftInfo(icao24 as String) as Dictionary? {
-        if (icao24.length() == 0) { return null; }
-        var v = _acInfo.get(icao24);
-        return (v instanceof Dictionary) ? v : null;
-    }
-
-    function flightInfo(callsign as String) as Dictionary? {
-        if (callsign.length() == 0) { return null; }
-        var v = _acRouteInfo.get(callsign);
-        return (v instanceof Dictionary) ? v : null;
-    }
-
     // ---- POI detail (full OSM tags for the detail page) ----
 
     private function detailKeyFor(p as Poi) as String? {
@@ -865,7 +655,7 @@ class PoiModel {
         var key = detailKeyFor(p);
         if (key == null) { return; }
         if (_poiDetail.get(key) != null) { return; }
-        if (_metaPending || _fetchPending || _airPending || _detailPending) { return; }
+        if (_fetchPending || _detailPending) { return; }
         var now = Time.now().value();
         if (now - _lastDetailSec < 4) { return; }
         _detailPending = true;
@@ -873,7 +663,7 @@ class PoiModel {
         _detailKey = key;
         var q = "[out:json][timeout:25];" + p.osmType + "(" + p.osmId + ");out tags;";
         Communications.makeWebRequest(OVERPASS_MIRRORS[_opIndex], {"data" => q},
-                                      metaOptions(), method(:onDetailResponse));
+                                      overpassOptions(), method(:onDetailResponse));
     }
 
     function onDetailResponse(code as Number, data as Dictionary or String or Null) as Void {
@@ -896,90 +686,6 @@ class PoiModel {
         WatchUi.requestUpdate();
     }
 
-    private function metaOptions() as Dictionary {
-        return {
-            :method => Communications.HTTP_REQUEST_METHOD_GET,
-            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
-        };
-    }
-
-    function onTypeResponse(code as Number, data as Dictionary or String or Null) as Void {
-        _metaPending = false;
-        var key = _metaTypeKey;
-        _metaTypeKey = null;
-        if (key == null) { return; }
-        var label = ""; // cache "" on failure so we don't retry forever
-        if (code == 200 && data instanceof Dictionary) {
-            var resp = data["response"];
-            if (resp instanceof Dictionary) {
-                var ac = resp["aircraft"];
-                if (ac instanceof Dictionary) {
-                    label = buildTypeLabel(ac);
-                    _acInfo.put(key, ac);
-                }
-            }
-        }
-        _acType.put(key, label);
-        WatchUi.requestUpdate();
-    }
-
-    private function buildTypeLabel(ac as Dictionary) as String {
-        var t = ac["icao_type"];
-        if (!(t instanceof String) || t.length() == 0) { t = ac["type"]; }
-        var label = "";
-        var manuf = ac["manufacturer"];
-        if (manuf instanceof String && manuf.length() > 0) { label = manuf; }
-        if (t instanceof String && t.length() > 0) {
-            label = (label.length() > 0) ? (label + " " + t) : t;
-        }
-        var owner = ac["registered_owner"];
-        if (owner instanceof String && owner.length() > 0) {
-            label = (label.length() > 0) ? (label + " - " + owner) : owner;
-        }
-        return label;
-    }
-
-    function onRouteResponse(code as Number, data as Dictionary or String or Null) as Void {
-        _metaPending = false;
-        var key = _metaRouteKey;
-        _metaRouteKey = null;
-        if (key == null) { return; }
-        var label = "";
-        if (code == 200 && data instanceof Dictionary) {
-            var resp = data["response"];
-            if (resp instanceof Dictionary) {
-                var fr = resp["flightroute"];
-                if (fr instanceof Dictionary) {
-                    label = buildRouteLabel(fr);
-                    _acRouteInfo.put(key, fr);
-                }
-            }
-        }
-        _acRoute.put(key, label);
-        WatchUi.requestUpdate();
-    }
-
-    private function buildRouteLabel(fr as Dictionary) as String {
-        var origin = airportField(fr["origin"], "iata_code");
-        var dest = fr["destination"];
-        var dCode = airportField(dest, "iata_code");
-        var dCity = airportField(dest, "municipality");
-        var label = "";
-        if (origin.length() > 0) { label = origin + " "; }
-        label += "-> ";
-        if (dCode.length() > 0) { label += dCode; }
-        if (dCity.length() > 0) { label += " " + dCity; }
-        return label;
-    }
-
-    private function airportField(ap, field as String) as String {
-        if (ap instanceof Dictionary) {
-            var v = ap[field];
-            if (v instanceof String) { return v; }
-        }
-        return "";
-    }
-
     // ---- helpers ----
 
     private function numToD(v) as Double? {
@@ -988,15 +694,5 @@ class PoiModel {
             return v.toDouble();
         }
         return null;
-    }
-
-    private function trim(s as String) as String {
-        var chars = s.toCharArray();
-        var start = 0;
-        var end = chars.size();
-        while (start < end && chars[start] == ' ') { start++; }
-        while (end > start && chars[end - 1] == ' ') { end--; }
-        if (start == 0 && end == chars.size()) { return s; }
-        return s.substring(start, end);
     }
 }
