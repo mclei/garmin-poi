@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <properties>
-    <property id="radiusMeters" type="number">5000</property>
+    <property id="radiusMeters" type="number">10000</property>
     <property id="maxPois" type="number">40</property>
     <property id="aircraftRefreshSec" type="number">30</property>
 

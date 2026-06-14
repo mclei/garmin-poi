@@ -37,6 +37,7 @@ class Poi {
     public var osmId as String;     // OSM element id (for detail fetch)
     public var altM as Number;      // aircraft altitude in metres, -1 if unknown
     public var speedKmh as Number;  // aircraft ground speed in km/h, -1 if unknown
+    public var inView as Boolean;   // currently inside the field-of-view cone (hysteresis)
 
     function initialize(aName as String, aLat as Double, aLon as Double,
                         aCat as Number, aDetail as String) {
@@ -53,6 +54,7 @@ class Poi {
         osmId = "";
         altM = -1;
         speedKmh = -1;
+        inView = false;
     }
 }
 

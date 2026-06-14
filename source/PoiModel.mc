@@ -38,6 +38,13 @@ const POI_RADII = [50, 100, 200, 500, 1000, 2000, 5000] as Array<Number>;
 // the capped set to one corner; plain id order is even and we distance-sort.
 const POI_MAX_ELEMENTS = 60;
 
+// Field of view for land POIs: only those whose bearing is within FOV_ENTER of
+// the current heading are shown ("what you're looking at", ~90 deg total). Once
+// shown, a POI stays until it passes FOV_EXIT - the hysteresis stops it from
+// flickering on/off as you turn near the edge. Aircraft ignore this (full 360).
+const FOV_ENTER = 45.0;
+const FOV_EXIT = 55.0;
+
 const MAX_AIRCRAFT = 25;
 
 // Central application state: position, heading, POI data and fetch logic.
@@ -114,7 +121,7 @@ class PoiModel {
         poiError = 0;
         airStatus = STATUS_IDLE;
         airError = 0;
-        radiusM = 5000;
+        radiusM = 10000;   // aircraft search radius (10 km)
         maxPois = 40;
         airRefreshSec = 30;
         catEnabled = new Array<Boolean>[NUM_CATS];
@@ -176,7 +183,7 @@ class PoiModel {
     // ---- settings ----
 
     function reloadSettings() as Void {
-        radiusM = getNumProp("radiusMeters", 5000);
+        radiusM = getNumProp("radiusMeters", 10000);
         if (radiusM < 500) { radiusM = 500; }
         if (radiusM > 10000) { radiusM = 10000; }
         maxPois = getNumProp("maxPois", 40);
@@ -303,7 +310,9 @@ class PoiModel {
         var now = Time.now().value();
         maybeFetchPois(now);
         maybeFetchAircraft(now);
-        if (_dirty) { rebuildVisible(); }
+        // Rebuilt every tick so the field-of-view filter tracks the heading as
+        // you turn (re-filters the already-loaded POIs, no refetch).
+        rebuildVisible();
         maybeResolveAircraft(now);
     }
 
@@ -333,10 +342,23 @@ class PoiModel {
 
     private function rebuildVisible() as Void {
         var out = [] as Array<Poi>;
+        var hdg = headingDeg;
+        // Land POIs: keep only those in the field of view ahead, with
+        // hysteresis (enter at FOV_ENTER, leave at FOV_EXIT) so they don't
+        // flicker as you turn. Recomputed every tick as the heading changes.
         for (var i = 0; i < pois.size(); i++) {
             var p = pois[i];
-            if (effectiveCatEnabled(p.category)) { out.add(p); }
+            if (!effectiveCatEnabled(p.category)) {
+                p.inView = false;
+                continue;
+            }
+            var d = GeoUtils.angleDiff(p.bearing, hdg);
+            if (d < 0) { d = -d; }
+            var limit = p.inView ? FOV_EXIT : FOV_ENTER;
+            p.inView = (d <= limit);
+            if (p.inView) { out.add(p); }
         }
+        // Aircraft: always shown, full 360 deg (no field-of-view filter).
         if (effectiveCatEnabled(CAT_AIRCRAFT)) {
             for (var i = 0; i < aircraft.size(); i++) {
                 out.add(aircraft[i]);
