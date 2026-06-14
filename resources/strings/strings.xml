@@ -14,8 +14,9 @@
     <string id="ClearTarget">Clear target</string>
     <string id="MenuShowOnly">Show only (once)</string>
     <string id="MenuMyFilters">Back to my filters</string>
-    <string id="ListAll">Show all directions</string>
-    <string id="ListInView">In view only</string>
+    <string id="ListAll">All around (360°)</string>
+    <string id="ListInView">In view only (90°)</string>
+    <string id="ListTapSwitch">tap to switch</string>
 
     <string id="CatMonument">Monuments &amp; memorials</string>
     <string id="CatCastle">Castles &amp; forts</string>

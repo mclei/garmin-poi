@@ -29,11 +29,13 @@ module PoiUi {
         var menu = new WatchUi.Menu2({
             :title => WatchUi.loadResource(Rez.Strings.MenuNearby)
         });
-        // First item toggles the field-of-view filter on/off for the list, so
-        // you can browse POIs in every direction (including behind you).
-        var toggle = showAll ? Rez.Strings.ListInView : Rez.Strings.ListAll;
+        // First item names the CURRENT field-of-view mode (so you can see which
+        // is active); tapping it switches to the other and rebuilds the list.
+        var curMode = showAll ? Rez.Strings.ListAll : Rez.Strings.ListInView;
         menu.addItem(new WatchUi.MenuItem(
-            WatchUi.loadResource(toggle) as String, null, -2, null));
+            WatchUi.loadResource(curMode) as String,
+            WatchUi.loadResource(Rez.Strings.ListTapSwitch) as String,
+            -2, null));
         if (vis.size() == 0) {
             menu.addItem(new WatchUi.MenuItem(
                 WatchUi.loadResource(Rez.Strings.NoPois) as String,
