@@ -197,24 +197,27 @@ class MainView extends WatchUi.View {
         var route = _model.aircraftRoute(f.name);  // null=loading, ""=unknown
         var type = _model.aircraftType(f.icao24);
 
-        // callsign (flight id) — small header
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - (ring * 0.36).toNumber(), Graphics.FONT_XTINY,
-                    fitText(dc, f.name, Graphics.FONT_XTINY, maxW),
+        // The four key fields, evenly stacked: callsign, destination,
+        // altitude, type. Speed + distance are secondary (smallest).
+
+        // callsign (flight id)
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - (ring * 0.30).toNumber(), Graphics.FONT_TINY,
+                    fitText(dc, f.name, Graphics.FONT_TINY, maxW),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // destination / route
         var routeText = (route == null) ? "resolving..."
                       : (route.length() == 0 ? "route n/a" : route);
         dc.setColor(0x00FFFF, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - (ring * 0.20).toNumber(), Graphics.FONT_SMALL,
+        dc.drawText(cx, cy - (ring * 0.13).toNumber(), Graphics.FONT_SMALL,
                     fitText(dc, routeText, Graphics.FONT_SMALL, maxW),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // ALTITUDE — the big standout number to tell planes apart
+        // altitude (same size as the route line)
         var altText = (f.altM >= 0) ? (f.altM.toString() + " m") : "alt ?";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy + (ring * 0.01).toNumber(), Graphics.FONT_NUMBER_MEDIUM,
+        dc.drawText(cx, cy + (ring * 0.04).toNumber(), Graphics.FONT_SMALL,
                     altText,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
@@ -223,18 +226,18 @@ class MainView extends WatchUi.View {
                      : (type.length() == 0 ? "type n/a" : type);
         if (typeText.length() > 0) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy + (ring * 0.24).toNumber(), Graphics.FONT_XTINY,
-                        fitText(dc, typeText, Graphics.FONT_XTINY, maxW),
+            dc.drawText(cx, cy + (ring * 0.20).toNumber(), Graphics.FONT_TINY,
+                        fitText(dc, typeText, Graphics.FONT_TINY, maxW),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
-        // speed + distance
+        // speed + distance (secondary)
         var line = "";
         if (f.speedKmh >= 0) { line += f.speedKmh.toString() + " km/h"; }
         if (line.length() > 0) { line += "  "; }
         line += GeoUtils.formatDistance(f.distance);
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy + (ring * 0.36).toNumber(), Graphics.FONT_XTINY,
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy + (ring * 0.34).toNumber(), Graphics.FONT_XTINY,
                     fitText(dc, line, Graphics.FONT_XTINY, maxW),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
