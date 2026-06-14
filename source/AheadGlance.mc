@@ -2,13 +2,19 @@ import Toybox.Application;
 import Toybox.Communications;
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Math;
 import Toybox.Position;
+import Toybox.Sensor;
+import Toybox.Timer;
 import Toybox.WatchUi;
 
 // Small radius / element cap keep the glance's web response tiny enough for the
-// glance memory budget (it only needs the nearest place).
+// glance memory budget (it only needs nearby places).
 const GLANCE_RADIUS = 1500;
 const GLANCE_CAP = 20;
+const GLANCE_FOV = 45.0;     // pick the nearest place within this cone ahead
+const SCROLL_STEP = 4;       // px per tick for the marquee
+const SCROLL_GAP = 28;       // px gap between marquee repeats
 
 // Glance states
 const G_NOFIX = 0;
@@ -18,34 +24,70 @@ const G_EMPTY = 3;
 const G_ERR = 4;
 
 // Glance-carousel preview for Ahead. When scrolled into view it reads the
-// last-known position and runs one compact Overpass query, then shows the
-// nearest place. Self-contained: it does not touch the full PoiModel.
+// last-known position and runs one compact Overpass query; it then features the
+// nearest place in the direction you are facing (compass), and marquee-scrolls
+// the name so a long one can be read in full. Self-contained: no PoiModel.
 class AheadGlance extends WatchUi.GlanceView {
 
     private var _state as Number;
-    private var _name as String;
-    private var _dist as Float;
-    private var _count as Number;
     private var _lat as Double;
     private var _lon as Double;
     private var _pending as Boolean;
     private var _opIndex as Number;
 
+    // candidates from the last fetch (parallel arrays, bounded by GLANCE_CAP)
+    private var _names as Array<String>;
+    private var _bears as Array<Float>;
+    private var _dists as Array<Float>;
+
+    // current focused result + compass + marquee state
+    private var _name as String;
+    private var _dist as Float;
+    private var _heading as Float;
+    private var _haveHeading as Boolean;
+    private var _scroll as Number;
+    private var _timer as Timer.Timer?;
+
     function initialize() {
         GlanceView.initialize();
         _state = G_NOFIX;
-        _name = "";
-        _dist = 0.0;
-        _count = 0;
         _lat = 0.0;
         _lon = 0.0;
         _pending = false;
         _opIndex = 0;
+        _names = [] as Array<String>;
+        _bears = [] as Array<Float>;
+        _dists = [] as Array<Float>;
+        _name = "";
+        _dist = 0.0;
+        _heading = 0.0;
+        _haveHeading = false;
+        _scroll = 0;
+        _timer = null;
     }
 
-    // Fetch each time the glance scrolls into view.
     function onShow() as Void {
+        var t = new Timer.Timer();
+        t.start(method(:onTimer), 200, true);
+        _timer = t;
         startFetch();
+    }
+
+    function onHide() as Void {
+        var t = _timer;
+        if (t != null) { t.stop(); _timer = null; }
+    }
+
+    // Re-read the compass, re-pick the focused place, and advance the marquee.
+    function onTimer() as Void {
+        var si = Sensor.getInfo();
+        if (si != null && si.heading != null) {
+            _heading = GeoUtils.normDeg(Math.toDegrees(si.heading).toFloat());
+            _haveHeading = true;
+        }
+        if (_names.size() > 0) { pickFocused(); }
+        _scroll += SCROLL_STEP;
+        WatchUi.requestUpdate();
     }
 
     private function startFetch() as Void {
@@ -74,7 +116,8 @@ class AheadGlance extends WatchUi.GlanceView {
     function onResponse(code as Number, data as Dictionary or String or Null) as Void {
         _pending = false;
         if (code == 200 && data instanceof Dictionary) {
-            findNearest(data["elements"]);
+            buildCandidates(data["elements"]);
+            if (_names.size() > 0) { pickFocused(); } else { _state = G_EMPTY; }
         } else {
             _opIndex = (_opIndex + 1) % OVERPASS_MIRRORS.size();
             _state = G_ERR;
@@ -82,10 +125,10 @@ class AheadGlance extends WatchUi.GlanceView {
         WatchUi.requestUpdate();
     }
 
-    private function findNearest(elements) as Void {
-        var bestD = 1.0e12;
-        var bestName = "";
-        var n = 0;
+    private function buildCandidates(elements) as Void {
+        var names = [] as Array<String>;
+        var bears = [] as Array<Float>;
+        var dists = [] as Array<Float>;
         if (elements instanceof Array) {
             for (var i = 0; i < elements.size(); i++) {
                 var el = elements[i];
@@ -97,22 +140,90 @@ class AheadGlance extends WatchUi.GlanceView {
                 var plon = numToD(c[0]);
                 var plat = numToD(c[1]);
                 if (plat == null || plon == null) { continue; }
-                n++;
-                var d = GeoUtils.distanceM(_lat, _lon, plat, plon);
-                if (d < bestD) {
-                    bestD = d;
-                    bestName = nameOf(el["tags"]);
+                names.add(nameOf(el["tags"]));
+                bears.add(GeoUtils.bearingDeg(_lat, _lon, plat, plon));
+                dists.add(GeoUtils.distanceM(_lat, _lon, plat, plon));
+            }
+        }
+        _names = names;
+        _bears = bears;
+        _dists = dists;
+    }
+
+    // Nearest within the field-of-view cone; if none (or no compass), nearest
+    // overall. Resets the marquee when the featured place changes.
+    private function pickFocused() as Void {
+        var best = -1;
+        var bestD = 1.0e12;
+        if (_haveHeading) {
+            for (var i = 0; i < _names.size(); i++) {
+                var diff = GeoUtils.angleDiff(_bears[i], _heading);
+                if (diff < 0) { diff = -diff; }
+                if (diff <= GLANCE_FOV && _dists[i] < bestD) {
+                    best = i;
+                    bestD = _dists[i];
                 }
             }
         }
-        _count = n;
-        if (n > 0) {
-            _name = bestName;
-            _dist = bestD.toFloat();
-            _state = G_OK;
-        } else {
-            _state = G_EMPTY;
+        if (best < 0) {
+            bestD = 1.0e12;
+            for (var i = 0; i < _names.size(); i++) {
+                if (_dists[i] < bestD) { best = i; bestD = _dists[i]; }
+            }
         }
+        if (best >= 0) {
+            if (!_names[best].equals(_name)) { _scroll = 0; }  // restart marquee
+            _name = _names[best];
+            _dist = _dists[best];
+            _state = G_OK;
+        }
+    }
+
+    function onUpdate(dc as Dc) as Void {
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var fh = dc.getFontHeight(Graphics.FONT_GLANCE);
+        var y1 = (h / 2 - fh * 0.55).toNumber();
+        var y2 = (h / 2 + fh * 0.55).toNumber();
+
+        // top line: app name + distance of the featured place
+        var top = "Ahead";
+        if (_state == G_OK) { top += "  " + GeoUtils.formatDistance(_dist); }
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(0, y1, Graphics.FONT_GLANCE, top,
+                    Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // bottom line: the place name (marquee) or a status message
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        if (_state == G_OK) {
+            drawMarquee(dc, _name, y2, w);
+        } else {
+            var msg = "Scanning...";
+            if (_state == G_NOFIX) { msg = "Waiting for GPS"; }
+            else if (_state == G_ERR) { msg = "No connection"; }
+            else if (_state == G_EMPTY) { msg = "Nothing nearby"; }
+            dc.drawText(0, y2, Graphics.FONT_GLANCE, msg,
+                        Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+    }
+
+    // Scroll the name leftwards and repeat, so a name wider than the glance can
+    // be read in full. Drawn text is clipped to the glance bounds.
+    private function drawMarquee(dc as Dc, text as String, y as Number,
+                                 w as Number) as Void {
+        var tw = dc.getTextWidthInPixels(text, Graphics.FONT_GLANCE);
+        if (tw <= w) {
+            dc.drawText(0, y, Graphics.FONT_GLANCE, text,
+                        Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            return;
+        }
+        var period = tw + SCROLL_GAP;
+        var off = _scroll % period;
+        var x = -off;
+        dc.drawText(x, y, Graphics.FONT_GLANCE, text,
+                    Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(x + period, y, Graphics.FONT_GLANCE, text,
+                    Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function nameOf(tags) as String {
@@ -129,31 +240,6 @@ class AheadGlance extends WatchUi.GlanceView {
         if (a instanceof String && a.length() > 0) { return a; }
         if (b instanceof String && b.length() > 0) { return b; }
         return "";
-    }
-
-    function onUpdate(dc as Dc) as Void {
-        var h = dc.getHeight();
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(0, h / 2 - dc.getFontHeight(Graphics.FONT_GLANCE),
-                    Graphics.FONT_GLANCE, "Ahead",
-                    Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        var value;
-        if (_state == G_LOADING) {
-            value = "Scanning...";
-        } else if (_state == G_NOFIX) {
-            value = "Waiting for GPS";
-        } else if (_state == G_ERR) {
-            value = "No connection";
-        } else if (_state == G_EMPTY) {
-            value = "Nothing nearby";
-        } else {
-            value = _name + "  " + GeoUtils.formatDistance(_dist);
-        }
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(0, h / 2 + dc.getFontHeight(Graphics.FONT_GLANCE) / 2,
-                    Graphics.FONT_GLANCE, value,
-                    Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     // Compact Overpass `convert` query honouring the saved category toggles,

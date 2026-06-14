@@ -48,11 +48,13 @@ add to the manifest.
 - **Fast start** — on launch the app seeds from the cached last-known position
   so POIs load immediately while the GPS warms up. The status line shows a
   leading `~` until a precise fix arrives, then the list is refined to it.
-- **Glance** — in the watch's glance carousel, Ahead shows the nearest place
-  ("Charles Bridge  120 m"). The glance fetches on demand *when it scrolls into
-  view*: it reads the last-known position and runs one small POI query (1.5 km,
-  honouring your category toggles), then displays the closest result. Tap it to
-  open the full app.
+- **Glance** — in the watch's glance carousel, Ahead shows the place in front
+  of you ("Charles Bridge  120 m"). It fetches on demand *when it scrolls into
+  view*: reads the last-known position and runs one small POI query (1.5 km,
+  honouring your category toggles), then features the nearest place **within
+  your compass field of view** (nearest overall if you're facing nothing). The
+  name **marquee-scrolls** so a long one can be read in full. Tap to open the
+  full app.
 
 ## Data sources (free, no API keys)
 
