@@ -13,8 +13,9 @@ import Toybox.WatchUi;
 const GLANCE_RADIUS = 1500;
 const GLANCE_CAP = 20;
 const GLANCE_FOV = 45.0;     // pick the nearest place within this cone ahead
-const SCROLL_STEP = 4;       // px per tick for the marquee
+const SCROLL_STEP = 4;       // px per 200 ms tick for the marquee
 const SCROLL_GAP = 28;       // px gap between marquee repeats
+const PICK_TICKS = 5;        // re-pick by heading every Nth tick (~1 s)
 
 // Glance states
 const G_NOFIX = 0;
@@ -46,6 +47,7 @@ class AheadGlance extends WatchUi.GlanceView {
     private var _heading as Float;
     private var _haveHeading as Boolean;
     private var _scroll as Number;
+    private var _ticks as Number;
     private var _timer as Timer.Timer?;
 
     function initialize() {
@@ -63,6 +65,7 @@ class AheadGlance extends WatchUi.GlanceView {
         _heading = 0.0;
         _haveHeading = false;
         _scroll = 0;
+        _ticks = 0;
         _timer = null;
     }
 
@@ -78,16 +81,24 @@ class AheadGlance extends WatchUi.GlanceView {
         if (t != null) { t.stop(); _timer = null; }
     }
 
-    // Re-read the compass, re-pick the focused place, and advance the marquee.
+    // Advance the marquee every tick (smooth scroll), but only re-read the
+    // compass and re-pick the featured place about once a second.
     function onTimer() as Void {
+        _ticks += 1;
+        if (_ticks % PICK_TICKS == 0 && _names.size() > 0) {
+            readHeading();
+            pickFocused();
+        }
+        _scroll += SCROLL_STEP;
+        WatchUi.requestUpdate();
+    }
+
+    private function readHeading() as Void {
         var si = Sensor.getInfo();
         if (si != null && si.heading != null) {
             _heading = GeoUtils.normDeg(Math.toDegrees(si.heading).toFloat());
             _haveHeading = true;
         }
-        if (_names.size() > 0) { pickFocused(); }
-        _scroll += SCROLL_STEP;
-        WatchUi.requestUpdate();
     }
 
     private function startFetch() as Void {
@@ -117,7 +128,12 @@ class AheadGlance extends WatchUi.GlanceView {
         _pending = false;
         if (code == 200 && data instanceof Dictionary) {
             buildCandidates(data["elements"]);
-            if (_names.size() > 0) { pickFocused(); } else { _state = G_EMPTY; }
+            if (_names.size() > 0) {
+                readHeading();
+                pickFocused();
+            } else {
+                _state = G_EMPTY;
+            }
         } else {
             _opIndex = (_opIndex + 1) % OVERPASS_MIRRORS.size();
             _state = G_ERR;
