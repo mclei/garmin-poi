@@ -740,6 +740,8 @@ class PoiModel {
                     var p = new Poi(name, plat, plon, CAT_AIRCRAFT, detail);
                     var tr = numToD(s[10]);
                     if (tr != null) { p.track = tr.toFloat(); }
+                    if (alt != null) { p.altM = alt.toNumber(); }
+                    if (vel != null) { p.speedKmh = (vel * 3.6).toNumber(); }
                     var icao = s[0];
                     if (icao instanceof String) { p.icao24 = trim(icao); }
                     fresh.add(p);
