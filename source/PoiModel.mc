@@ -7,7 +7,14 @@ import Toybox.Sensor;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+// Global Overpass mirrors (all carry worldwide data). We pick a starting one
+// from the position and rotate to the next on any failure, so the app never
+// hard-depends on a single instance (overpass-api.de in particular is flaky).
+const OVERPASS_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter"
+] as Array<String>;
 const OPENSKY_URL = "https://opensky-network.org/api/states/all";
 
 // OpenSky has no aircraft type or destination, so the focused aircraft's type
@@ -22,11 +29,12 @@ const ADSBDB_CALLSIGN_URL = "https://api.adsbdb.com/v0/callsign/";
 // what keeps the response small enough for the watch to parse everywhere.
 const POI_RADII = [200, 500, 1000, 2000, 5000] as Array<Number>;
 
-// Hard cap on returned rows, purely so a dense stopping radius can't produce a
-// response too large to parse. No "qt" sort here: quadtile order biases the
+// Hard cap on returned elements, so a dense stopping radius can't produce a
+// JSON response too large to parse (each element is ~300-500 bytes). We only
+// display the nearest maxPois anyway. No "qt" sort: quadtile order biases the
 // capped set to one corner; plain id order is geographically even and we
-// distance-sort on the device regardless.
-const POI_MAX_ELEMENTS = 250;
+// distance-sort on the device.
+const POI_MAX_ELEMENTS = 100;
 
 const MAX_AIRCRAFT = 25;
 
@@ -67,6 +75,8 @@ class PoiModel {
     private var _fetchLon as Double?;
     private var _fetchedMask as Number;  // land categories included in last fetch
     private var _ladderIdx as Number;    // current step in POI_RADII expanding search
+    private var _opIndex as Number;      // current Overpass mirror
+    private var _opInit as Boolean;      // mirror seeded from position yet?
     private var _dirty as Boolean;
 
     // Aircraft detail caches (resolved lazily from adsbdb for the focused plane)
@@ -116,6 +126,8 @@ class PoiModel {
         _fetchLon = null;
         _fetchedMask = 0;
         _ladderIdx = 0;
+        _opIndex = 0;
+        _opInit = false;
         _dirty = true;
         _acType = {} as Dictionary;
         _acRoute = {} as Dictionary;
@@ -370,24 +382,38 @@ class PoiModel {
             mask |= (1 << CAT_CASTLE) | (1 << CAT_RUINS);
         }
         _fetchedMask = mask;
-        var options = {
-            :method => Communications.HTTP_REQUEST_METHOD_GET,
-            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_TEXT_PLAIN
-        };
-        Communications.makeWebRequest(OVERPASS_URL,
+        if (!_opInit && lat != null) {
+            _opIndex = mirrorStart();   // pick a starting mirror from the position
+            _opInit = true;
+        }
+        Communications.makeWebRequest(OVERPASS_MIRRORS[_opIndex],
                                       {"data" => buildQuery(POI_RADII[_ladderIdx])},
-                                      options, method(:onPoiResponse));
+                                      overpassOptions(), method(:onPoiResponse));
     }
 
-    // CSV output requesting only the columns we use keeps the response tiny
-    // (~50 bytes/row vs ~550 for full JSON), which is what lets the watch parse
-    // it. Columns: type, lat, lon, name, historic, tourism, amenity (tab-sep).
+    private function overpassOptions() as Dictionary {
+        return {
+            :method => Communications.HTTP_REQUEST_METHOD_GET,
+            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
+        };
+    }
+
+    private function mirrorStart() as Number {
+        var a = (lat as Double).toNumber();
+        var b = (lon as Double).toNumber();
+        if (a < 0) { a = -a; }
+        if (b < 0) { b = -b; }
+        return (a + b) % OVERPASS_MIRRORS.size();
+    }
+
+    // JSON output (application/json matches the JSON response type cleanly; CSV
+    // is text/csv which the watch rejects as not text/plain -> error -400). The
+    // expanding radius keeps the element count, hence the JSON size, small.
     private function buildQuery(radius as Number) as String {
         var la = (lat as Double).format("%.5f");
         var lo = (lon as Double).format("%.5f");
         var ar = "(around:" + radius.toString() + "," + la + "," + lo + ");";
-        var q = "[out:csv(::type,::id,::lat,::lon,name,historic,tourism,amenity;false)]"
-              + "[timeout:25];(";
+        var q = "[out:json][timeout:25];(";
         // Historic: a broad nwr[historic] covers monuments/memorials and is
         // classified down to castles/ruins; if only the narrow toggles are on,
         // fetch just those subsets.
@@ -427,8 +453,8 @@ class PoiModel {
 
     function onPoiResponse(code as Number, data as Dictionary or String or Null) as Void {
         _fetchPending = false;
-        if (code == 200 && data instanceof String) {
-            var fresh = parseCsv(data);
+        if (code == 200 && data instanceof Dictionary) {
+            var fresh = parseElements(data["elements"]);
             if (fresh.size() > 0) {
                 finalizePois(fresh);
             } else if (_ladderIdx < POI_RADII.size() - 1) {
@@ -444,10 +470,11 @@ class PoiModel {
                 poiError = 0;
             }
         } else {
-            // Transient (overpass-api.de intermittently 406s/504s); retried by
-            // maybeFetchPois against the same radius after a short backoff.
+            // Failure (e.g. overpass-api.de's intermittent 406 -> -400). Fail
+            // over to the next mirror; maybeFetchPois retries after a backoff.
             poiStatus = STATUS_ERROR;
             poiError = code;
+            _opIndex = (_opIndex + 1) % OVERPASS_MIRRORS.size();
         }
         WatchUi.requestUpdate();
     }
@@ -469,58 +496,43 @@ class PoiModel {
         poiError = 0;
     }
 
-    // Parse tab-separated CSV rows into Poi objects in a single pass.
-    private function parseCsv(text as String) as Array<Poi> {
+    // Parse Overpass JSON elements into Poi objects.
+    private function parseElements(elements) as Array<Poi> {
         var out = [] as Array<Poi>;
-        var chars = text.toCharArray();
-        var n = chars.size();
-        var cols = new Array<String>[8];
-        for (var k = 0; k < 8; k++) { cols[k] = ""; }
-        var field = 0;
-        var cur = "";
-        for (var i = 0; i <= n; i++) {
-            var ch = (i < n) ? chars[i] : '\n';
-            if (ch == '\t') {
-                if (field < 8) { cols[field] = cur; }
-                field++;
-                cur = "";
-            } else if (ch == '\n') {
-                if (field < 8) { cols[field] = cur; }
-                if (field >= 7) {            // a full row has 7 tabs / 8 columns
-                    var poi = rowToPoi(cols);
-                    if (poi != null) { out.add(poi); }
+        if (!(elements instanceof Array)) { return out; }
+        for (var i = 0; i < elements.size(); i++) {
+            var el = elements[i];
+            if (!(el instanceof Dictionary)) { continue; }
+            var tags = el["tags"];
+            if (!(tags instanceof Dictionary)) { continue; }
+            var plat = numToD(el["lat"]);
+            var plon = numToD(el["lon"]);
+            if (plat == null) {
+                var c = el["center"];   // ways/relations carry a center
+                if (c instanceof Dictionary) {
+                    plat = numToD(c["lat"]);
+                    plon = numToD(c["lon"]);
                 }
-                for (var k2 = 0; k2 < 8; k2++) { cols[k2] = ""; }
-                field = 0;
-                cur = "";
-            } else if (ch != '\r') {
-                cur += ch.toString();
             }
+            if (plat == null || plon == null) { continue; }
+            var cd = categorizeTags(strOf(tags["historic"]),
+                                    strOf(tags["tourism"]),
+                                    strOf(tags["amenity"]));
+            if (cd == null) { continue; }
+            var subtype = prettify(cd[1] as String);
+            var name = strOf(tags["name"]);
+            if (name.length() == 0) { name = subtype; }
+            var p = new Poi(name, plat, plon, cd[0] as Number, subtype);
+            p.osmType = strOf(el["type"]);
+            var idv = el["id"];
+            p.osmId = (idv != null) ? idv.toString() : "";
+            out.add(p);
         }
         return out;
     }
 
-    // cols = [type, id, lat, lon, name, historic, tourism, amenity]
-    private function rowToPoi(cols as Array<String>) as Poi? {
-        var plat = parseCoord(cols[2]);
-        var plon = parseCoord(cols[3]);
-        if (plat == null || plon == null) { return null; }
-        var cd = categorizeTags(cols[5], cols[6], cols[7]);
-        if (cd == null) { return null; }
-        var subtype = prettify(cd[1] as String);
-        var name = cols[4];
-        if (name.length() == 0) { name = subtype; }
-        var p = new Poi(name, plat, plon, cd[0] as Number, subtype);
-        p.osmType = cols[0];
-        p.osmId = cols[1];
-        return p;
-    }
-
-    private function parseCoord(s as String) as Double? {
-        if (s.length() == 0) { return null; }
-        var f = s.toFloat();
-        if (f == null) { return null; }
-        return f.toDouble();
+    private function strOf(v) as String {
+        return (v instanceof String) ? v : "";
     }
 
     // Classify from the historic/tourism/amenity column values (empty = absent).
@@ -772,7 +784,7 @@ class PoiModel {
         _lastDetailSec = now;
         _detailKey = key;
         var q = "[out:json][timeout:25];" + p.osmType + "(" + p.osmId + ");out tags;";
-        Communications.makeWebRequest(OVERPASS_URL, {"data" => q},
+        Communications.makeWebRequest(OVERPASS_MIRRORS[_opIndex], {"data" => q},
                                       metaOptions(), method(:onDetailResponse));
     }
 

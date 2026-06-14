@@ -47,7 +47,7 @@ any modern Connect IQ device you add to the manifest.
 
 | Data | Source | Notes |
 |------|--------|-------|
-| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Public `overpass-api.de`, fair-use: fetched at most every ~60 s and after moving >400 m. The query asks for **CSV** with only the fields used (name, coordinates, type) so the response stays small enough to parse on-watch — full JSON is far too large in dense areas. The public instance is sometimes flaky (intermittent 406/504); transient failures are retried. To use a different instance, change `OVERPASS_URL` in `source/PoiModel.mc`. |
+| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Several **global mirrors** (`overpass-api.de`, `kumi.systems`, `private.coffee`); a starting one is picked from your position and the app **fails over to the next on any error** (overpass-api.de in particular intermittently 406s). Fetched at most every ~60 s and after moving >400 m. The expanding radius keeps the JSON response small enough to parse on-watch. Edit `OVERPASS_MIRRORS` in `source/PoiModel.mc` to change the list. |
 | Aircraft positions | [OpenSky Network](https://opensky-network.org) | Anonymous access has a daily request budget (~400 credits/day, 1–4 per call). Default refresh is 30 s; raise it in settings if you watch planes for hours. |
 | Aircraft type & route | [adsbdb.com](https://www.adsbdb.com) | Free, keyless. OpenSky has no type/destination, so the **focused** aircraft's type (by Mode-S address) and route (by callsign) are fetched here and cached. Only the focused plane is looked up, so volume stays low. |
 
@@ -121,9 +121,9 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 
 | Input | Action |
 |-------|--------|
-| **Tap the screen** | Open the **detail page** of the shown POI (scrollable: full description/tags for places, type + route for aircraft) |
+| **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: full description/tags for places, type + route for aircraft) |
+| **Swipe in from the right edge** | Filters menu (settings) — category toggles + "Refresh now" |
 | Swipe up | Nearest-POI list; select an entry opens its detail page |
-| **Start/Enter button**, or **swipe in from the right edge** | Filters menu — category toggles + "Refresh now" |
 | Long-press screen | Filters menu (only where the firmware emits it) |
 | Back | Exit |
 
@@ -176,7 +176,7 @@ and push — the workflow runs automatically.
 | Symptom | Cause |
 |---------|-------|
 | `POI err -104` | Watch not connected to the phone / no internet |
-| `POI err 406` / `504` / `429` | The public `overpass-api.de` instance is flaky or busy; retried automatically every ~8 s. Persistent failures mean the instance is down — try later, or point `OVERPASS_URL` at another instance. |
+| `POI err 406` / `-400` / `504` / `429` | A mirror failed (overpass-api.de 406s a lot, which surfaces as -400). The app fails over to the next mirror and retries every ~8 s; usually transient. |
 | `air err 429` | OpenSky anonymous daily budget exhausted |
 | `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
 | Compass frozen | Calibrate compass (figure-8 motion); Venu X1 has a magnetometer |
