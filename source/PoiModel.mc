@@ -31,6 +31,11 @@ const POI_RADII = [50, 100, 200, 500, 1000, 2000, 5000] as Array<Number>;
 // the capped set to one corner; plain id order is even and we distance-sort.
 const POI_MAX_ELEMENTS = 60;
 
+// Keep widening the search until at least this many POIs are found (or the
+// widest radius is reached) - a tight radius returning only a couple of hits
+// isn't useful, so gather more from a wider circle.
+const POI_MIN_RESULTS = 10;
+
 // Field of view for land POIs: only those whose bearing is within FOV_ENTER of
 // the current heading are shown ("what you're looking at", ~90 deg total). Once
 // shown, a POI stays until it passes FOV_EXIT - the hysteresis stops it from
@@ -475,20 +480,14 @@ class PoiModel {
         if (code == 200 && data instanceof Dictionary) {
             _opTries = 0;
             var fresh = parseElements(data["elements"]);
-            if (fresh.size() > 0) {
-                finalizePois(fresh);
-            } else if (_ladderIdx < POI_RADII.size() - 1) {
-                // Nothing within this radius: widen the search and try again.
+            if (fresh.size() < POI_MIN_RESULTS && _ladderIdx < POI_RADII.size() - 1) {
+                // Too few within this radius (a wider circle is a superset):
+                // widen the search to gather more, until enough or at max range.
                 _ladderIdx++;
                 fetchPois();
                 return;
-            } else {
-                // Nothing even within the largest radius.
-                pois = [] as Array<Poi>;
-                _dirty = true;
-                poiStatus = STATUS_IDLE;
-                poiError = 0;
             }
+            finalizePois(fresh);   // enough results, or already at the widest
         } else {
             // Failure (overpass-api.de intermittently 406s/504s -> -400). Its
             // failures alternate per request, so retry the SAME mirror a few

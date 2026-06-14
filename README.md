@@ -35,8 +35,9 @@ any modern Connect IQ device you add to the manifest.
   of you (within ~45° of your heading, ~90° total). As you turn, the set
   re-filters live from the already-loaded data (no refetch), with hysteresis so
   POIs near the edge don't flicker.
-- **Range** — an *expanding search* that widens only until something is found
-  (up to 5 km). The starting radius tracks GPS precision: **50 m** on a good
+- **Range** — an *expanding search* that widens until it has found enough POIs
+  (about 10), or reaches 5 km. A tight radius with only a hit or two keeps
+  widening so you get a useful set, not just the single closest thing. The starting radius tracks GPS precision: **50 m** on a good
   fix, ~200 m on a usable one, ~500 m while the position is still approximate —
   so a precise fix in a city shows exactly what's right in front of you. The
   query uses Overpass `convert` to return only the fields it needs, keeping the
