@@ -34,4 +34,10 @@ class AheadApp extends Application.AppBase {
         var model = getModel();
         return [new MainView(model), new MainDelegate(model)];
     }
+
+    // Glance carousel preview. It fetches on its own (last-known position +
+    // one small POI query) when shown - independent of the full app/model.
+    function getGlanceView() {
+        return [new AheadGlance()];
+    }
 }
