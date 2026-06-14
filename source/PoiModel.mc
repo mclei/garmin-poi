@@ -7,13 +7,14 @@ import Toybox.Sensor;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-// Global Overpass mirrors (all carry worldwide data). We pick a starting one
-// from the position and rotate to the next on any failure, so the app never
-// hard-depends on a single instance (overpass-api.de in particular is flaky).
+// Global Overpass mirrors (all carry worldwide data), tried in order with
+// failover. The main overpass-api.de instance round-robins ~50% of requests to
+// a backend that returns HTTP 406 (-> -400 on the watch), so it is NOT reliable
+// enough to lead with; the mail.ru mirror answered 100% in testing. Reorder
+// this list to prefer a different instance (e.g. a self-hosted one).
 const OVERPASS_MIRRORS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter"
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass-api.de/api/interpreter"
 ] as Array<String>;
 const OPENSKY_URL = "https://opensky-network.org/api/states/all";
 
