@@ -21,10 +21,16 @@ module PoiUi {
     }
 
     function pushPoiList(model as PoiModel) as Void {
-        var vis = model.visible;
+        var showAll = model.listShowAll;
+        var vis = showAll ? model.poisAllDirections() : model.visible;
         var menu = new WatchUi.Menu2({
             :title => WatchUi.loadResource(Rez.Strings.MenuNearby)
         });
+        // First item toggles the field-of-view filter on/off for the list, so
+        // you can browse POIs in every direction (including behind you).
+        var toggle = showAll ? Rez.Strings.ListInView : Rez.Strings.ListAll;
+        menu.addItem(new WatchUi.MenuItem(
+            WatchUi.loadResource(toggle) as String, null, -2, null));
         if (vis.size() == 0) {
             menu.addItem(new WatchUi.MenuItem(
                 WatchUi.loadResource(Rez.Strings.NoPois) as String,
@@ -124,8 +130,15 @@ class PoiListDelegate extends WatchUi.Menu2InputDelegate {
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId();
-        if (id instanceof Number && id >= 0 && id < _items.size()) {
-            PoiUi.pushDetail(_model, _items[id]); // list item -> detail page
+        if (id instanceof Number) {
+            if (id == -2) {
+                // toggle the field-of-view filter and rebuild the list
+                _model.listShowAll = !_model.listShowAll;
+                WatchUi.popView(WatchUi.SLIDE_RIGHT);
+                PoiUi.pushPoiList(_model);
+            } else if (id >= 0 && id < _items.size()) {
+                PoiUi.pushDetail(_model, _items[id]); // list item -> detail page
+            }
         }
     }
 }

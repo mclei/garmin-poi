@@ -125,7 +125,7 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 | **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: full description, address, hours, website, …) |
 | **Swipe in from the right edge** | Filters menu (settings) — category toggles + "Refresh now" |
 | **Swipe down** | Quick "show only one category" — a one-shot (e.g. just restaurants, or just museums) that does **not** change your saved filters; the next normal search reverts to them |
-| Swipe up | Nearest-POI list; select an entry opens its detail page |
+| Swipe up | Nearest-POI list; select an entry opens its detail page. The first row toggles the field-of-view filter, so you can list POIs in **all directions** (including behind you), not just those ahead |
 | Long-press screen | Filters menu (only where the firmware emits it) |
 | Back | Exit |
 

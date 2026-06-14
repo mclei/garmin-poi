@@ -60,6 +60,7 @@ class PoiModel {
     public var pois as Array<Poi>;       // land POIs, distance-sorted
     public var visible as Array<Poi>;    // field-of-view filtered, distance-sorted
     public var targetPoi as Poi?;        // user-locked target
+    public var listShowAll as Boolean;   // Nearby list: all directions vs in-view only
 
     // Status
     public var poiStatus as Number;
@@ -98,6 +99,7 @@ class PoiModel {
         pois = [] as Array<Poi>;
         visible = [] as Array<Poi>;
         targetPoi = null;
+        listShowAll = false;
         poiStatus = STATUS_IDLE;
         poiError = 0;
         maxPois = 40;
@@ -315,6 +317,18 @@ class PoiModel {
             targetPoi = null;
         }
         _dirty = false;
+    }
+
+    // All category-enabled POIs, distance-sorted, ignoring the field-of-view
+    // filter - used by the Nearby list when "all directions" is selected.
+    function poisAllDirections() as Array<Poi> {
+        var out = [] as Array<Poi>;
+        for (var i = 0; i < pois.size(); i++) {
+            var p = pois[i];
+            if (effectiveCatEnabled(p.category)) { out.add(p); }
+        }
+        GeoUtils.sortByDistance(out);
+        return out;
     }
 
     // The POI to feature on screen: locked target, else nearest within the
