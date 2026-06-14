@@ -49,8 +49,11 @@ class MainView extends WatchUi.View {
 
         if (_model.lat == null) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy, Graphics.FONT_MEDIUM,
+            dc.drawText(cx, cy - 12, Graphics.FONT_MEDIUM,
                         WatchUi.loadResource(Rez.Strings.WaitGps),
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(cx, cy + 18, Graphics.FONT_XTINY,
+                        WatchUi.loadResource(Rez.Strings.Subtitle),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             drawStatus(dc, cx, cy, ring, w, h);
             return;

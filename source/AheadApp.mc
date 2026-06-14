@@ -2,7 +2,7 @@ import Toybox.Application;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-class PoiFinderApp extends Application.AppBase {
+class AheadApp extends Application.AppBase {
 
     private var _model as PoiModel?;
 

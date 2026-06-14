@@ -1,10 +1,13 @@
-# POI Finder — Garmin watch app
+# Ahead — Garmin watch app
 
-"What am I standing in front of?" — a Connect IQ watch app that shows the
-nearest points of interest around you using GPS and the magnetic compass.
-As you turn, a live arrow points at the POI you are facing, with its name
-and distance. Built for the **Garmin Venu X1** (square display), works on
-any modern Connect IQ device you add to the manifest.
+### The place in front of you
+
+"What's that place I'm looking at?" — a Connect IQ watch app that names the
+point of interest **in front of you** using GPS and the magnetic compass.
+Point your wrist and the place you're facing is shown with its name, distance
+and details; turn and it updates to whatever you now face. Built for the
+**Garmin Venu X1** (square display), works on any modern Connect IQ device you
+add to the manifest.
 
 ## Features
 
@@ -63,7 +66,7 @@ monkey.jungle           build file
 resources/              strings, properties, settings UI, launcher icon
 scripts/make_icon.py    regenerates the launcher icon (stdlib-only Python)
 source/
-  PoiFinderApp.mc       app entry point
+  AheadApp.mc           app entry point
   PoiModel.mc           GPS, compass, Overpass fetching, state
   Poi.mc                POI class, categories
   GeoUtils.mc           distance/bearing math, formatting
@@ -100,14 +103,14 @@ openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
 ### 3. Build
 
 ```sh
-monkeyc -d venux1 -f monkey.jungle -o PoiFinder.prg -y developer_key.der
+monkeyc -d venux1 -f monkey.jungle -o Ahead.prg -y developer_key.der
 ```
 
 ### 4. Run in the simulator (recommended first)
 
 ```sh
 connectiq            # starts the simulator
-monkeydo PoiFinder.prg venux1
+monkeydo Ahead.prg venux1
 ```
 
 In the simulator use *Simulation → Locations* to set a GPS position
@@ -115,7 +118,7 @@ In the simulator use *Simulation → Locations* to set a GPS position
 
 ### 5. Sideload to the watch
 
-Connect the watch over USB (MTP) and copy `PoiFinder.prg` into the
+Connect the watch over USB (MTP) and copy `Ahead.prg` into the
 watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 
 ## Usage
@@ -143,7 +146,7 @@ The launcher icon can be regenerated with `python3 scripts/make_icon.py`.
 
 ## Settings
 
-Via Garmin Connect Mobile (or Connect IQ Store app) → POI Finder →
+Via Garmin Connect Mobile (or Connect IQ Store app) → Ahead →
 Settings: max places and the category toggles. (POIs auto-expand 200 m→5 km
 and need no radius setting.) Category toggles changed on the watch are
 persisted and synced back.
@@ -151,9 +154,9 @@ persisted and synced back.
 ## CI (GitHub Actions)
 
 `.github/workflows/build.yml` builds the app on every push/PR and uploads
-`PoiFinder.prg` as a workflow artifact (download it from the run page and
+`Ahead.prg` as a workflow artifact (download it from the run page and
 sideload it). On `v*` tags it additionally exports the store package
-(`PoiFinder.iq`).
+(`Ahead.iq`).
 
 It runs inside the community-maintained
 [`ghcr.io/matco/connectiq-tester`](https://github.com/matco/connectiq-tester)

@@ -47,26 +47,26 @@ jobs:
 
       - name: Build (venux1)
         run: |
-          monkeyc -d venux1 -f monkey.jungle -o PoiFinder.prg \
+          monkeyc -d venux1 -f monkey.jungle -o Ahead.prg \
             -y developer_key.der -w
 
       - name: Upload sideloadable app
         uses: actions/upload-artifact@v4
         with:
-          name: PoiFinder-venux1
-          path: PoiFinder.prg
+          name: Ahead-venux1
+          path: Ahead.prg
           if-no-files-found: error
 
       # On version tags, also produce the store-upload package (.iq)
       - name: Export store package
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          monkeyc -e -f monkey.jungle -o PoiFinder.iq -y developer_key.der -w
+          monkeyc -e -f monkey.jungle -o Ahead.iq -y developer_key.der -w
 
       - name: Upload store package
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
-          name: PoiFinder-store-package
-          path: PoiFinder.iq
+          name: Ahead-store-package
+          path: Ahead.iq
           if-no-files-found: error

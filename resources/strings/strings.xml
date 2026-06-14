@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <strings>
-    <string id="AppName">POI Finder</string>
+    <string id="AppName">Ahead</string>
+    <string id="Subtitle">The place in front of you</string>
 
     <string id="WaitGps">Waiting for GPS...</string>
     <string id="Loading">Loading places...</string>
