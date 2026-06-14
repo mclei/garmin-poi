@@ -228,14 +228,20 @@ class PoiModel {
         return _oneShotCat;
     }
 
-    // One-time shot: show only this category now, without changing settings.
-    // The next normal search (move/refresh/filter change) reverts to settings.
+    // One-time shot: show only this category now (even one disabled in the
+    // saved filters), without changing settings. The next normal search
+    // (move >400 m / refresh / filter change) reverts to the saved filters.
     function loadOnlyCategory(cat as Number) as Void {
         _oneShotCat = cat;
         _dirty = true;
+        // Reset the fresh-search triggers so the override can't be cleared on
+        // the very next tick before it has loaded.
+        _needPoiFetch = false;
+        if (lat != null) { _fetchLat = lat; _fetchLon = lon; }
+        _lastPoiAttemptSec = Time.now().value();
         if (cat < NUM_LAND_CATS) {
+            pois = [] as Array<Poi>;    // drop stale data of other categories
             _oneShotPending = true;     // trigger a land fetch for just this cat
-            _lastPoiAttemptSec = 0;
         } else {
             _lastAirAttemptSec = 0;     // aircraft: force an immediate refresh
         }

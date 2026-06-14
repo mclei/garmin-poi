@@ -170,22 +170,22 @@ class MainView extends WatchUi.View {
         // name
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         var name = fitText(dc, f.name, Graphics.FONT_MEDIUM, (ring * 1.7).toNumber());
-        dc.drawText(cx, cy - (ring * 0.08).toNumber(), Graphics.FONT_MEDIUM, name,
+        dc.drawText(cx, cy - (ring * 0.10).toNumber(), Graphics.FONT_MEDIUM, name,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // distance
-        dc.drawText(cx, cy + (ring * 0.14).toNumber(), Graphics.FONT_NUMBER_MILD,
+        // distance (well below the name so the tall number font can't overlap)
+        dc.drawText(cx, cy + (ring * 0.22).toNumber(), Graphics.FONT_NUMBER_MILD,
                     GeoUtils.formatDistance(f.distance),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // detail: subtype / altitude + category
+        // detail: subtype / category
         dc.setColor(PoiCat.color(f.category), Graphics.COLOR_TRANSPARENT);
         var detail = f.detail;
         if (detail.length() == 0) {
             detail = PoiCat.shortName(f.category);
         }
         detail = fitText(dc, detail, Graphics.FONT_XTINY, (ring * 1.6).toNumber());
-        dc.drawText(cx, cy + (ring * 0.34).toNumber(), Graphics.FONT_XTINY, detail,
+        dc.drawText(cx, cy + (ring * 0.42).toNumber(), Graphics.FONT_XTINY, detail,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
