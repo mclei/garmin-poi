@@ -118,10 +118,14 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 
 | Input | Action |
 |-------|--------|
+| **Tap the screen** | Open the **detail page** of the shown POI (scrollable: full description/tags for places, type + route for aircraft) |
+| Swipe up | Nearest-POI list; select an entry opens its detail page |
 | **Start/Enter button**, or **swipe in from the right edge** | Filters menu — category toggles + "Refresh now" |
-| Tap screen / swipe up | Nearest-POI list; select = lock target |
 | Long-press screen | Filters menu (only where the firmware emits it) |
 | Back | Exit |
+
+On the detail page: swipe up/down (or the buttons) to scroll, **Start** to
+lock/unlock the POI as your target, **Back** to return.
 
 On a sideloaded build the phone settings are unavailable, so the **Filters
 menu is where you turn POI categories on and off** — open it with the Start

@@ -71,10 +71,19 @@ class PoiModel {
     // Aircraft detail caches (resolved lazily from adsbdb for the focused plane)
     private var _acType as Dictionary;   // icao24 -> type label ("" = unknown)
     private var _acRoute as Dictionary;  // callsign -> route label ("" = unknown)
+    private var _acInfo as Dictionary;   // icao24 -> raw aircraft fields dict
+    private var _acRouteInfo as Dictionary; // callsign -> raw flightroute dict
     private var _metaPending as Boolean;
     private var _lastMetaSec as Number;
     private var _metaTypeKey as String?;   // icao24 of in-flight type request
     private var _metaRouteKey as String?;  // callsign of in-flight route request
+
+    // Full-tag cache for the POI detail page (key "type/id" -> tags dict;
+    // "" cached on failure). Fetched on demand when a detail page opens.
+    private var _poiDetail as Dictionary;
+    private var _detailPending as Boolean;
+    private var _detailKey as String?;
+    private var _lastDetailSec as Number;
 
     function initialize() {
         lat = null;
@@ -108,10 +117,16 @@ class PoiModel {
         _dirty = true;
         _acType = {} as Dictionary;
         _acRoute = {} as Dictionary;
+        _acInfo = {} as Dictionary;
+        _acRouteInfo = {} as Dictionary;
         _metaPending = false;
         _lastMetaSec = 0;
         _metaTypeKey = null;
         _metaRouteKey = null;
+        _poiDetail = {} as Dictionary;
+        _detailPending = false;
+        _detailKey = null;
+        _lastDetailSec = 0;
         reloadSettings();
     }
 
@@ -350,7 +365,7 @@ class PoiModel {
         var la = (lat as Double).format("%.5f");
         var lo = (lon as Double).format("%.5f");
         var ar = "(around:" + radius.toString() + "," + la + "," + lo + ");";
-        var q = "[out:csv(::type,::lat,::lon,name,historic,tourism,amenity;false)]"
+        var q = "[out:csv(::type,::id,::lat,::lon,name,historic,tourism,amenity;false)]"
               + "[timeout:25];(";
         // Historic: a broad nwr[historic] covers monuments/memorials and is
         // classified down to castles/ruins; if only the narrow toggles are on,
@@ -438,23 +453,23 @@ class PoiModel {
         var out = [] as Array<Poi>;
         var chars = text.toCharArray();
         var n = chars.size();
-        var cols = new Array<String>[7];
-        for (var k = 0; k < 7; k++) { cols[k] = ""; }
+        var cols = new Array<String>[8];
+        for (var k = 0; k < 8; k++) { cols[k] = ""; }
         var field = 0;
         var cur = "";
         for (var i = 0; i <= n; i++) {
             var ch = (i < n) ? chars[i] : '\n';
             if (ch == '\t') {
-                if (field < 7) { cols[field] = cur; }
+                if (field < 8) { cols[field] = cur; }
                 field++;
                 cur = "";
             } else if (ch == '\n') {
-                if (field < 7) { cols[field] = cur; }
-                if (field >= 6) {            // a full row has 6 tabs / 7 columns
+                if (field < 8) { cols[field] = cur; }
+                if (field >= 7) {            // a full row has 7 tabs / 8 columns
                     var poi = rowToPoi(cols);
                     if (poi != null) { out.add(poi); }
                 }
-                for (var k2 = 0; k2 < 7; k2++) { cols[k2] = ""; }
+                for (var k2 = 0; k2 < 8; k2++) { cols[k2] = ""; }
                 field = 0;
                 cur = "";
             } else if (ch != '\r') {
@@ -464,17 +479,20 @@ class PoiModel {
         return out;
     }
 
-    // cols = [type, lat, lon, name, historic, tourism, amenity]
+    // cols = [type, id, lat, lon, name, historic, tourism, amenity]
     private function rowToPoi(cols as Array<String>) as Poi? {
-        var plat = parseCoord(cols[1]);
-        var plon = parseCoord(cols[2]);
+        var plat = parseCoord(cols[2]);
+        var plon = parseCoord(cols[3]);
         if (plat == null || plon == null) { return null; }
-        var cd = categorizeTags(cols[4], cols[5], cols[6]);
+        var cd = categorizeTags(cols[5], cols[6], cols[7]);
         if (cd == null) { return null; }
         var subtype = prettify(cd[1] as String);
-        var name = cols[3];
+        var name = cols[4];
         if (name.length() == 0) { name = subtype; }
-        return new Poi(name, plat, plon, cd[0] as Number, subtype);
+        var p = new Poi(name, plat, plon, cd[0] as Number, subtype);
+        p.osmType = cols[0];
+        p.osmId = cols[1];
+        return p;
     }
 
     private function parseCoord(s as String) as Double? {
@@ -663,11 +681,18 @@ class PoiModel {
     }
 
     private function maybeResolveAircraft(now as Number) as Void {
-        if (_metaPending || _fetchPending || _airPending) { return; }
-        if (now - _lastMetaSec < 2) { return; }
         if (!catEnabled[CAT_AIRCRAFT]) { return; }
         var f = focusedPoi();
         if (f == null || f.category != CAT_AIRCRAFT) { return; }
+        resolveAircraftFor(f);
+    }
+
+    // Resolve type/route for a specific aircraft. Public so the detail page
+    // (where the main view's timer is paused) can keep it progressing.
+    function resolveAircraftFor(f as Poi) as Void {
+        if (_metaPending || _fetchPending || _airPending) { return; }
+        var now = Time.now().value();
+        if (now - _lastMetaSec < 2) { return; }
         // One lookup per call: type first (by Mode-S), then route (by callsign).
         if (f.icao24.length() > 0 && _acType.get(f.icao24) == null) {
             _metaPending = true;
@@ -684,6 +709,70 @@ class PoiModel {
             Communications.makeWebRequest(ADSBDB_CALLSIGN_URL + f.name, {},
                                           metaOptions(), method(:onRouteResponse));
         }
+    }
+
+    function aircraftInfo(icao24 as String) as Dictionary? {
+        if (icao24.length() == 0) { return null; }
+        var v = _acInfo.get(icao24);
+        return (v instanceof Dictionary) ? v : null;
+    }
+
+    function flightInfo(callsign as String) as Dictionary? {
+        if (callsign.length() == 0) { return null; }
+        var v = _acRouteInfo.get(callsign);
+        return (v instanceof Dictionary) ? v : null;
+    }
+
+    // ---- POI detail (full OSM tags for the detail page) ----
+
+    private function detailKeyFor(p as Poi) as String? {
+        if (p.osmType.length() == 0 || p.osmId.length() == 0) { return null; }
+        return p.osmType + "/" + p.osmId;
+    }
+
+    // Full tag dictionary for a POI, or null if not fetched yet.
+    function poiDetail(p as Poi) as Dictionary? {
+        var key = detailKeyFor(p);
+        if (key == null) { return null; }
+        var v = _poiDetail.get(key);
+        return (v instanceof Dictionary) ? v : null;
+    }
+
+    // Fetch the focused element's full tags on demand. No-op if already loaded,
+    // a request is in flight, or it was attempted very recently.
+    function requestPoiDetail(p as Poi) as Void {
+        var key = detailKeyFor(p);
+        if (key == null) { return; }
+        if (_poiDetail.get(key) != null) { return; }
+        if (_metaPending || _fetchPending || _airPending || _detailPending) { return; }
+        var now = Time.now().value();
+        if (now - _lastDetailSec < 4) { return; }
+        _detailPending = true;
+        _lastDetailSec = now;
+        _detailKey = key;
+        var q = "[out:json][timeout:25];" + p.osmType + "(" + p.osmId + ");out tags;";
+        Communications.makeWebRequest(OVERPASS_URL, {"data" => q},
+                                      metaOptions(), method(:onDetailResponse));
+    }
+
+    function onDetailResponse(code as Number, data as Dictionary or String or Null) as Void {
+        _detailPending = false;
+        var key = _detailKey;
+        _detailKey = null;
+        if (key == null) { return; }
+        if (code == 200 && data instanceof Dictionary) {
+            var tags = {} as Dictionary;
+            var elements = data["elements"];
+            if (elements instanceof Array && elements.size() > 0) {
+                var el = elements[0];
+                if (el instanceof Dictionary && el["tags"] instanceof Dictionary) {
+                    tags = el["tags"];
+                }
+            }
+            _poiDetail.put(key, tags); // store (possibly empty) = loaded
+        }
+        // On transient failure, leave it unset so the detail page retries.
+        WatchUi.requestUpdate();
     }
 
     private function metaOptions() as Dictionary {
@@ -703,7 +792,10 @@ class PoiModel {
             var resp = data["response"];
             if (resp instanceof Dictionary) {
                 var ac = resp["aircraft"];
-                if (ac instanceof Dictionary) { label = buildTypeLabel(ac); }
+                if (ac instanceof Dictionary) {
+                    label = buildTypeLabel(ac);
+                    _acInfo.put(key, ac);
+                }
             }
         }
         _acType.put(key, label);
@@ -736,7 +828,10 @@ class PoiModel {
             var resp = data["response"];
             if (resp instanceof Dictionary) {
                 var fr = resp["flightroute"];
-                if (fr instanceof Dictionary) { label = buildRouteLabel(fr); }
+                if (fr instanceof Dictionary) {
+                    label = buildRouteLabel(fr);
+                    _acRouteInfo.put(key, fr);
+                }
             }
         }
         _acRoute.put(key, label);

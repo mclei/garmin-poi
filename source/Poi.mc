@@ -33,6 +33,8 @@ class Poi {
     public var bearing as Float;    // degrees true, 0..360
     public var track as Float?;     // aircraft ground track, degrees true
     public var icao24 as String;    // aircraft Mode-S address (key for type lookup)
+    public var osmType as String;   // "node"/"way"/"relation" (for detail fetch)
+    public var osmId as String;     // OSM element id (for detail fetch)
 
     function initialize(aName as String, aLat as Double, aLon as Double,
                         aCat as Number, aDetail as String) {
@@ -45,6 +47,8 @@ class Poi {
         bearing = 0.0;
         track = null;
         icao24 = "";
+        osmType = "";
+        osmId = "";
     }
 }
 

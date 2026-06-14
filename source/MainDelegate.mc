@@ -5,7 +5,8 @@ import Toybox.WatchUi;
 //   Start/Enter button .......... Filters menu (categories + Refresh)
 //   Swipe in from right edge .... Filters menu
 //   Long-press (where supported)  Filters menu
-//   Tap / swipe up .............. Nearby POI list (select = lock target)
+//   Tap ......................... detail page of the shown POI
+//   Swipe up .................... Nearby POI list
 //   Back ........................ exit
 class MainDelegate extends WatchUi.BehaviorDelegate {
 
@@ -43,7 +44,10 @@ class MainDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
-        PoiUi.pushPoiList(_model);
+        var f = _model.focusedPoi();
+        if (f != null) {
+            PoiUi.pushDetail(_model, f);
+        }
         return true;
     }
 }

@@ -25,11 +25,6 @@ module PoiUi {
         var menu = new WatchUi.Menu2({
             :title => WatchUi.loadResource(Rez.Strings.MenuNearby)
         });
-        if (model.targetPoi != null) {
-            menu.addItem(new WatchUi.MenuItem(
-                WatchUi.loadResource(Rez.Strings.ClearTarget) as String,
-                null, -2, null));
-        }
         if (vis.size() == 0) {
             menu.addItem(new WatchUi.MenuItem(
                 WatchUi.loadResource(Rez.Strings.NoPois) as String,
@@ -45,6 +40,12 @@ module PoiUi {
             menu.addItem(new WatchUi.MenuItem(p.name, sub, i, null));
         }
         WatchUi.pushView(menu, new PoiListDelegate(model, vis), WatchUi.SLIDE_LEFT);
+    }
+
+    // Scrollable detail page for a single POI / aircraft.
+    function pushDetail(model as PoiModel, poi as Poi) as Void {
+        var v = new DetailView(model, poi);
+        WatchUi.pushView(v, new DetailDelegate(v), WatchUi.SLIDE_LEFT);
     }
 }
 
@@ -83,13 +84,8 @@ class PoiListDelegate extends WatchUi.Menu2InputDelegate {
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId();
-        if (id instanceof Number) {
-            if (id == -2) {
-                _model.targetPoi = null;
-            } else if (id >= 0 && id < _items.size()) {
-                _model.targetPoi = _items[id];
-            }
+        if (id instanceof Number && id >= 0 && id < _items.size()) {
+            PoiUi.pushDetail(_model, _items[id]); // list item -> detail page
         }
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 }
