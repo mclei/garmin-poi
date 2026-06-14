@@ -11,5 +11,5 @@
     <property id="catBar" type="boolean">false</property>
     <property id="catMuseum" type="boolean">true</property>
     <property id="catTheatre" type="boolean">false</property>
-    <property id="catWorship" type="boolean">false</property>
+    <property id="catWorship" type="boolean">true</property>
 </properties>

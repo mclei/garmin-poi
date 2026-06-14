@@ -79,7 +79,7 @@ module PoiCat {
     // default on/off state when no stored property exists
     const DEFAULTS = [
         true, true, true, true, true, false,
-        false, true, false, false
+        false, true, false, true
     ] as Array<Boolean>;
 
     function color(cat as Number) as Number { return COLORS[cat]; }
