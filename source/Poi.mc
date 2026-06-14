@@ -32,6 +32,7 @@ class Poi {
     public var distance as Float;   // meters from current position
     public var bearing as Float;    // degrees true, 0..360
     public var track as Float?;     // aircraft ground track, degrees true
+    public var icao24 as String;    // aircraft Mode-S address (key for type lookup)
 
     function initialize(aName as String, aLat as Double, aLon as Double,
                         aCat as Number, aDetail as String) {
@@ -43,6 +44,7 @@ class Poi {
         distance = 0.0;
         bearing = 0.0;
         track = null;
+        icao24 = "";
     }
 }
 

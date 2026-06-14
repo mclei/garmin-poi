@@ -158,6 +158,15 @@ class MainView extends WatchUi.View {
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
 
+        if (f.category == CAT_AIRCRAFT) {
+            drawFocusedAircraft(dc, cx, cy, ring, f);
+        } else {
+            drawFocusedPoi(dc, cx, cy, ring, f);
+        }
+    }
+
+    private function drawFocusedPoi(dc as Dc, cx as Number, cy as Number,
+                                    ring as Number, f as Poi) as Void {
         // name
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         var name = fitText(dc, f.name, Graphics.FONT_MEDIUM, (ring * 1.7).toNumber());
@@ -177,6 +186,47 @@ class MainView extends WatchUi.View {
         }
         detail = fitText(dc, detail, Graphics.FONT_XTINY, (ring * 1.6).toNumber());
         dc.drawText(cx, cy + (ring * 0.34).toNumber(), Graphics.FONT_XTINY, detail,
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // Aircraft: destination and type are the headline (resolved from adsbdb);
+    // callsign, distance and altitude are secondary.
+    private function drawFocusedAircraft(dc as Dc, cx as Number, cy as Number,
+                                         ring as Number, f as Poi) as Void {
+        var maxW = (ring * 1.8).toNumber();
+        var route = _model.aircraftRoute(f.name);  // null=loading, ""=unknown
+        var type = _model.aircraftType(f.icao24);
+
+        // callsign (flight id) — small header
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - (ring * 0.26).toNumber(), Graphics.FONT_XTINY,
+                    fitText(dc, f.name, Graphics.FONT_XTINY, maxW),
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // destination / route — the headline
+        var routeText = (route == null) ? "resolving..."
+                      : (route.length() == 0 ? "route n/a" : route);
+        dc.setColor(0x00FFFF, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - (ring * 0.06).toNumber(), Graphics.FONT_MEDIUM,
+                    fitText(dc, routeText, Graphics.FONT_MEDIUM, maxW),
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // aircraft type + operator
+        var typeText = (type == null) ? ""
+                     : (type.length() == 0 ? "type n/a" : type);
+        if (typeText.length() > 0) {
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + (ring * 0.14).toNumber(), Graphics.FONT_XTINY,
+                        fitText(dc, typeText, Graphics.FONT_XTINY, maxW),
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+
+        // distance + altitude/speed
+        var line = GeoUtils.formatDistance(f.distance);
+        if (f.detail.length() > 0) { line += " | " + f.detail; }
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy + (ring * 0.30).toNumber(), Graphics.FONT_XTINY,
+                    fitText(dc, line, Graphics.FONT_XTINY, maxW),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 

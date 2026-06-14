@@ -10,6 +10,12 @@ import Toybox.WatchUi;
 const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const OPENSKY_URL = "https://opensky-network.org/api/states/all";
 
+// OpenSky has no aircraft type or destination, so the focused aircraft's type
+// (by Mode-S address) and route (by callsign) are resolved on demand from the
+// free, keyless adsbdb.com and cached. Only the focused aircraft is looked up.
+const ADSBDB_AIRCRAFT_URL = "https://api.adsbdb.com/v0/aircraft/";
+const ADSBDB_CALLSIGN_URL = "https://api.adsbdb.com/v0/callsign/";
+
 // Land POIs use an expanding search: start tight and widen only when nothing
 // is found, up to 5 km. In a dense city you stop at 200 m (tiny response); in
 // open country you reach far, where there is little to return anyway. This is
@@ -62,6 +68,14 @@ class PoiModel {
     private var _ladderIdx as Number;    // current step in POI_RADII expanding search
     private var _dirty as Boolean;
 
+    // Aircraft detail caches (resolved lazily from adsbdb for the focused plane)
+    private var _acType as Dictionary;   // icao24 -> type label ("" = unknown)
+    private var _acRoute as Dictionary;  // callsign -> route label ("" = unknown)
+    private var _metaPending as Boolean;
+    private var _lastMetaSec as Number;
+    private var _metaTypeKey as String?;   // icao24 of in-flight type request
+    private var _metaRouteKey as String?;  // callsign of in-flight route request
+
     function initialize() {
         lat = null;
         lon = null;
@@ -92,6 +106,12 @@ class PoiModel {
         _fetchedMask = 0;
         _ladderIdx = 0;
         _dirty = true;
+        _acType = {} as Dictionary;
+        _acRoute = {} as Dictionary;
+        _metaPending = false;
+        _lastMetaSec = 0;
+        _metaTypeKey = null;
+        _metaRouteKey = null;
         reloadSettings();
     }
 
@@ -193,6 +213,7 @@ class PoiModel {
         maybeFetchPois(now);
         maybeFetchAircraft(now);
         if (_dirty) { rebuildVisible(); }
+        maybeResolveAircraft(now);
     }
 
     // ---- visible set / focus ----
@@ -611,6 +632,8 @@ class PoiModel {
                     var p = new Poi(name, plat, plon, CAT_AIRCRAFT, detail);
                     var tr = numToD(s[10]);
                     if (tr != null) { p.track = tr.toFloat(); }
+                    var icao = s[0];
+                    if (icao instanceof String) { p.icao24 = trim(icao); }
                     fresh.add(p);
                 }
             }
@@ -623,6 +646,122 @@ class PoiModel {
             airError = code;
         }
         WatchUi.requestUpdate();
+    }
+
+    // ---- aircraft type/route resolution (adsbdb) ----
+
+    // Resolved labels for the focused aircraft; null = not looked up yet,
+    // "" = looked up but unknown, otherwise a display string.
+    function aircraftType(icao24 as String) as String? {
+        if (icao24.length() == 0) { return null; }
+        return _acType.get(icao24);
+    }
+
+    function aircraftRoute(callsign as String) as String? {
+        if (callsign.length() == 0) { return null; }
+        return _acRoute.get(callsign);
+    }
+
+    private function maybeResolveAircraft(now as Number) as Void {
+        if (_metaPending || _fetchPending || _airPending) { return; }
+        if (now - _lastMetaSec < 2) { return; }
+        if (!catEnabled[CAT_AIRCRAFT]) { return; }
+        var f = focusedPoi();
+        if (f == null || f.category != CAT_AIRCRAFT) { return; }
+        // One lookup per call: type first (by Mode-S), then route (by callsign).
+        if (f.icao24.length() > 0 && _acType.get(f.icao24) == null) {
+            _metaPending = true;
+            _lastMetaSec = now;
+            _metaTypeKey = f.icao24;
+            Communications.makeWebRequest(ADSBDB_AIRCRAFT_URL + f.icao24, {},
+                                          metaOptions(), method(:onTypeResponse));
+            return;
+        }
+        if (f.name.length() > 0 && _acRoute.get(f.name) == null) {
+            _metaPending = true;
+            _lastMetaSec = now;
+            _metaRouteKey = f.name;
+            Communications.makeWebRequest(ADSBDB_CALLSIGN_URL + f.name, {},
+                                          metaOptions(), method(:onRouteResponse));
+        }
+    }
+
+    private function metaOptions() as Dictionary {
+        return {
+            :method => Communications.HTTP_REQUEST_METHOD_GET,
+            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
+        };
+    }
+
+    function onTypeResponse(code as Number, data as Dictionary or String or Null) as Void {
+        _metaPending = false;
+        var key = _metaTypeKey;
+        _metaTypeKey = null;
+        if (key == null) { return; }
+        var label = ""; // cache "" on failure so we don't retry forever
+        if (code == 200 && data instanceof Dictionary) {
+            var resp = data["response"];
+            if (resp instanceof Dictionary) {
+                var ac = resp["aircraft"];
+                if (ac instanceof Dictionary) { label = buildTypeLabel(ac); }
+            }
+        }
+        _acType.put(key, label);
+        WatchUi.requestUpdate();
+    }
+
+    private function buildTypeLabel(ac as Dictionary) as String {
+        var t = ac["icao_type"];
+        if (!(t instanceof String) || t.length() == 0) { t = ac["type"]; }
+        var label = "";
+        var manuf = ac["manufacturer"];
+        if (manuf instanceof String && manuf.length() > 0) { label = manuf; }
+        if (t instanceof String && t.length() > 0) {
+            label = (label.length() > 0) ? (label + " " + t) : t;
+        }
+        var owner = ac["registered_owner"];
+        if (owner instanceof String && owner.length() > 0) {
+            label = (label.length() > 0) ? (label + " - " + owner) : owner;
+        }
+        return label;
+    }
+
+    function onRouteResponse(code as Number, data as Dictionary or String or Null) as Void {
+        _metaPending = false;
+        var key = _metaRouteKey;
+        _metaRouteKey = null;
+        if (key == null) { return; }
+        var label = "";
+        if (code == 200 && data instanceof Dictionary) {
+            var resp = data["response"];
+            if (resp instanceof Dictionary) {
+                var fr = resp["flightroute"];
+                if (fr instanceof Dictionary) { label = buildRouteLabel(fr); }
+            }
+        }
+        _acRoute.put(key, label);
+        WatchUi.requestUpdate();
+    }
+
+    private function buildRouteLabel(fr as Dictionary) as String {
+        var origin = airportField(fr["origin"], "iata_code");
+        var dest = fr["destination"];
+        var dCode = airportField(dest, "iata_code");
+        var dCity = airportField(dest, "municipality");
+        var label = "";
+        if (origin.length() > 0) { label = origin + " "; }
+        label += "-> ";
+        if (dCode.length() > 0) { label += dCode; }
+        if (dCity.length() > 0) { label += " " + dCity; }
+        return label;
+    }
+
+    private function airportField(ap, field as String) as String {
+        if (ap instanceof Dictionary) {
+            var v = ap[field];
+            if (v instanceof String) { return v; }
+        }
+        return "";
     }
 
     // ---- helpers ----

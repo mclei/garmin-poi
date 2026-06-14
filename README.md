@@ -29,8 +29,10 @@ any modern Connect IQ device you add to the manifest.
   - Museums & galleries — `tourism=museum/gallery/artwork`
   - Theatres & cinemas — `amenity=theatre/cinema/arts_centre`
   - Places of worship — `amenity=place_of_worship`
-  - Aircraft (live) — overhead air traffic with callsign, altitude, speed
-    and ground track
+  - Aircraft (live) — overhead air traffic. When you point at one, the main
+    screen shows its **destination** and **aircraft type** (e.g. "FRA → SAW
+    Istanbul" / "Airbus A321 - Pegasus"), plus callsign, distance, altitude
+    and speed. Type and route are looked up on demand for the focused plane.
 
   Defaults on: Monuments, Castles, Ruins, Viewpoints, Restaurants, Museums.
 - **Range** — land POIs use an *expanding search*: it starts at 200 m and
@@ -43,7 +45,8 @@ any modern Connect IQ device you add to the manifest.
 | Data | Source | Notes |
 |------|--------|-------|
 | Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Public `overpass-api.de`, fair-use: fetched at most every ~60 s and after moving >400 m. The query asks for **CSV** with only the fields used (name, coordinates, type) so the response stays small enough to parse on-watch — full JSON is far too large in dense areas. The public instance is sometimes flaky (intermittent 406/504); transient failures are retried. To use a different instance, change `OVERPASS_URL` in `source/PoiModel.mc`. |
-| Aircraft | [OpenSky Network](https://opensky-network.org) | Anonymous access has a daily request budget (~400 credits/day, 1–4 per call). Default refresh is 30 s; raise it in settings if you watch planes for hours. |
+| Aircraft positions | [OpenSky Network](https://opensky-network.org) | Anonymous access has a daily request budget (~400 credits/day, 1–4 per call). Default refresh is 30 s; raise it in settings if you watch planes for hours. |
+| Aircraft type & route | [adsbdb.com](https://www.adsbdb.com) | Free, keyless. OpenSky has no type/destination, so the **focused** aircraft's type (by Mode-S address) and route (by callsign) are fetched here and cached. Only the focused plane is looked up, so volume stays low. |
 
 Requests go through the **paired phone** (Garmin Connect Mobile must be
 running with internet access). Without the phone you'll see error `-104`.
