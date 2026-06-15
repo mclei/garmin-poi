@@ -46,6 +46,12 @@ const FOV_EXIT = 55.0;
 // Range used to scale the radar dots (matches the widest expanding radius).
 const POI_RANGE = 5000.0;
 
+// Compass smoothing: ignore heading jitter smaller than the deadband, and ease
+// toward larger (real) changes so the display doesn't twitch with magnetometer
+// noise.
+const HEADING_DEADBAND = 2.0;  // degrees
+const HEADING_SMOOTH = 0.5;    // 0..1 fraction moved toward a new reading
+
 // Central application state: position, heading, POI data and fetch logic.
 class PoiModel {
 
@@ -55,6 +61,7 @@ class PoiModel {
     public var gpsQuality as Number;
     public var posApprox as Boolean;  // true until a usable-quality fix arrives
     public var headingDeg as Float;
+    private var _haveHeading as Boolean;
 
     // Data
     public var pois as Array<Poi>;       // land POIs, distance-sorted
@@ -96,6 +103,7 @@ class PoiModel {
         gpsQuality = 0;
         posApprox = false;
         headingDeg = 0.0;
+        _haveHeading = false;
         pois = [] as Array<Poi>;
         visible = [] as Array<Poi>;
         targetPoi = null;
@@ -263,7 +271,16 @@ class PoiModel {
     function tick() as Void {
         var si = Sensor.getInfo();
         if (si != null && si.heading != null) {
-            headingDeg = GeoUtils.normDeg(Math.toDegrees(si.heading).toFloat());
+            var raw = GeoUtils.normDeg(Math.toDegrees(si.heading).toFloat());
+            if (!_haveHeading) {
+                headingDeg = raw;          // first reading: take it as-is
+                _haveHeading = true;
+            } else {
+                var diff = GeoUtils.angleDiff(raw, headingDeg);
+                if (diff > HEADING_DEADBAND || diff < -HEADING_DEADBAND) {
+                    headingDeg = GeoUtils.normDeg(headingDeg + diff * HEADING_SMOOTH);
+                }
+            }
         }
         if (lat == null) { return; }
         var now = Time.now().value();
