@@ -494,14 +494,15 @@ class PoiModel {
         if (code == 200 && data instanceof Dictionary) {
             _opTries = 0;
             var fresh = parseElements(data["elements"]);
+            // Show what this radius found right away, then keep widening in the
+            // background if there are still too few. Each wider circle is a
+            // superset, so the on-screen list just grows as the steps return -
+            // the nearest points appear immediately, no waiting for 10.
+            finalizePois(fresh);
             if (fresh.size() < POI_MIN_RESULTS && _ladderIdx < POI_RADII.size() - 1) {
-                // Too few within this radius (a wider circle is a superset):
-                // widen the search to gather more, until enough or at max range.
                 _ladderIdx++;
                 fetchPois();
-                return;
             }
-            finalizePois(fresh);   // enough results, or already at the widest
         } else {
             // Failure (overpass-api.de intermittently 406s/504s -> -400). Its
             // failures alternate per request, so retry the SAME mirror a few
