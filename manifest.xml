@@ -8,7 +8,27 @@
         launcherIcon="@Drawables.LauncherIcon"
         minApiLevel="3.4.0">
         <iq:products>
+            <!-- square AMOLED -->
             <iq:product id="venux1"/>
+            <!-- round AMOLED -->
+            <iq:product id="venu2"/>
+            <iq:product id="venu2s"/>
+            <iq:product id="venu2plus"/>
+            <iq:product id="venu3"/>
+            <iq:product id="venu3s"/>
+            <iq:product id="vivoactive5"/>
+            <iq:product id="fr165"/>
+            <iq:product id="fr265"/>
+            <iq:product id="fr265s"/>
+            <iq:product id="fr965"/>
+            <iq:product id="epix2"/>
+            <!-- round MIP -->
+            <iq:product id="fenix7"/>
+            <iq:product id="fenix7s"/>
+            <iq:product id="fenix7x"/>
+            <iq:product id="fr255"/>
+            <iq:product id="fr255s"/>
+            <iq:product id="fr955"/>
         </iq:products>
         <iq:permissions>
             <iq:uses-permission id="Communications"/>

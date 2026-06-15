@@ -6,8 +6,10 @@
 point of interest **in front of you** using GPS and the magnetic compass.
 Point your wrist and the place you're facing is shown with its name, distance
 and details; turn and it updates to whatever you now face. Built for the
-**Garmin Venu X1** (square display), works on any modern Connect IQ device you
-add to the manifest.
+**Garmin Venu X1**, and works on **round** models too (the UI is centered and
+resolution‑independent; the detail page adapts its layout on round screens).
+The manifest lists a range of current round + square watches; add more via the
+SDK Manager.
 
 ## Features
 

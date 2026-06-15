@@ -1,5 +1,6 @@
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.System;
 import Toybox.Timer;
 import Toybox.WatchUi;
 
@@ -64,26 +65,33 @@ class DetailView extends WatchUi.View {
         dc.clear();
         var w = dc.getWidth();
         var h = dc.getHeight();
-        var margin = (w * 0.08).toNumber();
+        // On round screens the corners are cut off, so centre the text with a
+        // wider margin and extra top/bottom padding; rectangular screens keep
+        // the left-aligned layout that uses the full width.
+        var round = (System.getDeviceSettings().screenShape == System.SCREEN_SHAPE_ROUND);
+        var margin = round ? (w * 0.18).toNumber() : (w * 0.08).toNumber();
         var maxW = w - 2 * margin;
+        var pad = round ? (h * 0.16).toNumber() : 8;
+        var tx = round ? (w / 2) : margin;
+        var just = round ? Graphics.TEXT_JUSTIFY_CENTER : Graphics.TEXT_JUSTIFY_LEFT;
 
         var blocks = buildBlocks();
 
         // Measure total height first so we can clamp scrolling.
-        var total = 8;
+        var total = pad;
         for (var i = 0; i < blocks.size(); i++) {
             var b = blocks[i];
             var fh = dc.getFontHeight(b[1]);
             var lines = wrapText(dc, b[0], b[1], maxW);
             total += lines.size() * fh + 2;
         }
-        total += 8;
+        total += pad;
         _maxScroll = total - h;
         if (_maxScroll < 0) { _maxScroll = 0; }
         if (_scroll > _maxScroll) { _scroll = _maxScroll; }
 
         // Draw.
-        var y = 8 - _scroll;
+        var y = pad - _scroll;
         for (var i = 0; i < blocks.size(); i++) {
             var b = blocks[i];
             var font = b[1];
@@ -92,18 +100,18 @@ class DetailView extends WatchUi.View {
             for (var j = 0; j < lines.size(); j++) {
                 if (y + fh > 0 && y < h) {
                     dc.setColor(b[2], Graphics.COLOR_TRANSPARENT);
-                    dc.drawText(margin, y, font, lines[j], Graphics.TEXT_JUSTIFY_LEFT);
+                    dc.drawText(tx, y, font, lines[j], just);
                 }
                 y += fh + 2;
             }
         }
 
-        drawScrollbar(dc, w, h, total);
-        drawLockBadge(dc, w);
+        drawScrollbar(dc, w, h, total, round);
+        drawLockBadge(dc, w, round);
     }
 
     // Always-visible badge showing whether this POI is the locked target.
-    private function drawLockBadge(dc as Dc, w as Number) as Void {
+    private function drawLockBadge(dc as Dc, w as Number, round as Boolean) as Void {
         var locked = (_model.targetPoi == _poi);
         var txt = locked ? "LOCKED" : "UNLOCKED";
         var font = Graphics.FONT_XTINY;
@@ -111,9 +119,10 @@ class DetailView extends WatchUi.View {
         var fh = dc.getFontHeight(font);
         var bw = tw + 12;
         var bh = fh + 4;
-        // Leave room for the scrollbar (3px wide at w - 4).
-        var bx = w - bw - 8;
-        var by = 4;
+        // Round: centre at the top (corners are clipped). Rectangular: top-right
+        // (leaving room for the scrollbar at w - 4).
+        var bx = round ? ((w - bw) / 2) : (w - bw - 8);
+        var by = round ? 18 : 4;
         // Mask the content underneath so the badge stays legible.
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.fillRectangle(bx - 2, by - 2, bw + 4, bh + 4);
@@ -129,14 +138,15 @@ class DetailView extends WatchUi.View {
     }
 
     private function drawScrollbar(dc as Dc, w as Number, h as Number,
-                                   total as Number) as Void {
+                                   total as Number, round as Boolean) as Void {
         if (_maxScroll <= 0) { return; }
         var barH = (h * h) / total;
         if (barH < 16) { barH = 16; }
         var trackH = h - barH;
         var pos = (trackH * _scroll) / _maxScroll;
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(w - 4, pos, 3, barH);
+        // inset from the edge on round so the bar isn't clipped at the curve
+        dc.fillRectangle(w - (round ? 9 : 4), pos, 3, barH);
     }
 
     // Build display blocks: each is [text, font, color].
