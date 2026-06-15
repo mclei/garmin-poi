@@ -62,10 +62,14 @@ SDK Manager.
 
 | Data | Source | Notes |
 |------|--------|-------|
-| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Tries `maps.mail.ru` first (it answered 100% reliably in testing), failing over to `overpass-api.de` (whose public instance 406s ~half its requests, so it's only a fallback). **Note:** mail.ru is Russian infrastructure and receives your search coordinates — reorder `OVERPASS_MIRRORS` in `source/PoiModel.mc` (e.g. put `overpass-api.de` or a self-hosted instance first) if you'd rather not use it. The query uses Overpass `convert` to project only the needed fields → compact `application/json` (CSV would be smaller but the watch rejects `text/csv`). Fetched at most every ~60 s and after moving >400 m. |
+| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Tried in order with failover: `overpass-api.de` → `kumi.systems` → `private.coffee` (all EU), each retried a few times before rotating. `maps.mail.ru` is kept only as a last-resort fallback — it's Russian infrastructure and receives your search coordinates, so it's intentionally not the default (remove it from `OVERPASS_MIRRORS` in `source/PoiModel.mc` for a strict EU-only data path). The query uses Overpass `convert` to project only the needed fields → compact `application/json` (CSV would be smaller but the watch rejects `text/csv`). Fetched at most every ~60 s and after moving >400 m. |
 
 Requests go through the **paired phone** (Garmin Connect Mobile must be
 running with internet access). Without the phone you'll see error `-104`.
+
+**Attribution:** POI data is from OpenStreetMap — **© OpenStreetMap
+contributors** ([ODbL](https://www.openstreetmap.org/copyright)). The credit is
+also shown in‑app under Filters → "Map data".
 
 ## Project layout
 

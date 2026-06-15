@@ -20,6 +20,11 @@ module PoiUi {
         menu.addItem(new WatchUi.MenuItem(
             WatchUi.loadResource(Rez.Strings.MenuCalibrate) as String,
             null, "calibrate", null));
+        // OpenStreetMap attribution (ODbL) - informational row.
+        menu.addItem(new WatchUi.MenuItem(
+            WatchUi.loadResource(Rez.Strings.AboutData) as String,
+            WatchUi.loadResource(Rez.Strings.AboutCredit) as String,
+            "about", null));
         WatchUi.pushView(menu, new FilterMenuDelegate(model), WatchUi.SLIDE_UP);
     }
 

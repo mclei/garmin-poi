@@ -9,13 +9,17 @@ import Toybox.Time;
 import Toybox.WatchUi;
 
 // Global Overpass mirrors (all carry worldwide data), tried in order with
-// failover. The main overpass-api.de instance round-robins ~50% of requests to
-// a backend that returns HTTP 406 (-> -400 on the watch), so it is NOT reliable
-// enough to lead with; the mail.ru mirror answered 100% in testing. Reorder
-// this list to prefer a different instance (e.g. a self-hosted one).
+// failover (each is retried a few times, then we rotate). EU-based instances
+// lead, for a privacy-respectful default; maps.mail.ru is kept only as a
+// last-resort fallback (Russian infrastructure - not the default; remove it
+// for a strict EU-only data path). overpass-api.de is the canonical instance
+// but intermittently returns HTTP 406 (-> -400), which the per-mirror retry
+// handles before failing over.
 const OVERPASS_MIRRORS = [
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    "https://overpass-api.de/api/interpreter"
+    "https://overpass-api.de/api/interpreter",          // Germany
+    "https://overpass.kumi.systems/api/interpreter",    // Austria
+    "https://overpass.private.coffee/api/interpreter",  // Austria
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter"  // last resort
 ] as Array<String>;
 
 // Land POIs use an expanding search: start tight and widen only when nothing
