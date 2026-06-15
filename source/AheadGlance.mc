@@ -26,7 +26,7 @@ const G_EMPTY = 3;
 const G_ERR = 4;
 
 // Glance-carousel preview for Ahead. When scrolled into view it reads the
-// last-known position and runs one compact Overpass query; it then features the
+// last-known position and runs one compact Photon query; it then features the
 // nearest place in the direction you are facing (compass), and marquee-scrolls
 // the name so a long one can be read in full. Self-contained: no PoiModel.
 class AheadGlance extends WatchUi.GlanceView {
@@ -35,7 +35,6 @@ class AheadGlance extends WatchUi.GlanceView {
     private var _lat as Double;
     private var _lon as Double;
     private var _pending as Boolean;
-    private var _opIndex as Number;
 
     // candidates from the last fetch (parallel arrays, bounded by GLANCE_CAP)
     private var _names as Array<String>;
@@ -58,7 +57,6 @@ class AheadGlance extends WatchUi.GlanceView {
         _lat = 0.0;
         _lon = 0.0;
         _pending = false;
-        _opIndex = 0;
         _names = [] as Array<String>;
         _bears = [] as Array<Float>;
         _dists = [] as Array<Float>;
@@ -128,14 +126,13 @@ class AheadGlance extends WatchUi.GlanceView {
             :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
         };
         Communications.makeWebRequest(
-            OVERPASS_MIRRORS[_opIndex % OVERPASS_MIRRORS.size()],
-            {"data" => buildQuery()}, opts, method(:onResponse));
+            buildPhotonUrl(), {}, opts, method(:onResponse));
     }
 
     function onResponse(code as Number, data as Dictionary or String or Null) as Void {
         _pending = false;
         if (code == 200 && data instanceof Dictionary) {
-            buildCandidates(data["elements"]);
+            buildCandidates(data["features"]);
             if (_names.size() > 0) {
                 readHeading();
                 pickFocused();
@@ -143,19 +140,18 @@ class AheadGlance extends WatchUi.GlanceView {
                 _state = G_EMPTY;
             }
         } else {
-            _opIndex = (_opIndex + 1) % OVERPASS_MIRRORS.size();
             _state = G_ERR;
         }
         WatchUi.requestUpdate();
     }
 
-    private function buildCandidates(elements) as Void {
+    private function buildCandidates(features) as Void {
         var names = [] as Array<String>;
         var bears = [] as Array<Float>;
         var dists = [] as Array<Float>;
-        if (elements instanceof Array) {
-            for (var i = 0; i < elements.size(); i++) {
-                var el = elements[i];
+        if (features instanceof Array) {
+            for (var i = 0; i < features.size(); i++) {
+                var el = features[i];
                 if (!(el instanceof Dictionary)) { continue; }
                 var geom = el["geometry"];
                 if (!(geom instanceof Dictionary)) { continue; }
@@ -164,7 +160,7 @@ class AheadGlance extends WatchUi.GlanceView {
                 var plon = numToD(c[0]);
                 var plat = numToD(c[1]);
                 if (plat == null || plon == null) { continue; }
-                names.add(nameOf(el["tags"]));
+                names.add(nameOf(el["properties"]));
                 bears.add(GeoUtils.bearingDeg(_lat, _lon, plat, plon));
                 dists.add(GeoUtils.distanceM(_lat, _lon, plat, plon));
             }
@@ -253,63 +249,66 @@ class AheadGlance extends WatchUi.GlanceView {
                     Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    private function nameOf(tags) as String {
-        if (tags instanceof Dictionary) {
-            var nm = tags["name"];
+    private function nameOf(props) as String {
+        if (props instanceof Dictionary) {
+            var nm = props["name"];
             if (nm instanceof String && nm.length() > 0) { return nm; }
-            var sub = first(tags["h"], first(tags["to"], tags["a"]));
-            if (sub.length() > 0) { return prettify(sub); }
+            var sub = props["osm_value"];
+            if (sub instanceof String && sub.length() > 0) { return prettify(sub); }
         }
         return "place";
     }
 
-    private function first(a, b) as String {
-        if (a instanceof String && a.length() > 0) { return a; }
-        if (b instanceof String && b.length() > 0) { return b; }
-        return "";
-    }
-
-    // Compact Overpass `convert` query honouring the saved category toggles,
-    // at a small fixed radius (mirrors PoiModel.buildQuery, trimmed for size).
-    private function buildQuery() as String {
+    // Compact Photon /reverse query honouring the saved category toggles, at a
+    // small fixed radius (mirrors PoiModel.buildPhotonUrl, trimmed for size).
+    private function buildPhotonUrl() as String {
         var la = _lat.format("%.5f");
         var lo = _lon.format("%.5f");
-        var ar = "(around:" + GLANCE_RADIUS.toString() + "," + la + "," + lo + ");";
-        var q = "[out:json][timeout:20];(";
+        var km = (GLANCE_RADIUS / 1000.0).format("%.3f");
+        var url = PHOTON_URL + "?lat=" + la + "&lon=" + lo
+                + "&radius=" + km + "&limit=" + GLANCE_CAP.toString();
         if (catOn(CAT_MONUMENT)) {
-            q += "nwr[historic]" + ar;
+            url += tag("historic");
         } else {
             if (catOn(CAT_CASTLE)) {
-                q += "nwr[historic~\"^(castle|fort|fortress|city_gate|citadel|castle_wall|manor|palace)$\"]" + ar;
+                url += tag("historic:castle") + tag("historic:fort")
+                     + tag("historic:fortress") + tag("historic:city_gate")
+                     + tag("historic:citadel") + tag("historic:castle_wall")
+                     + tag("historic:manor") + tag("historic:palace");
             }
             if (catOn(CAT_RUINS)) {
-                q += "nwr[historic~\"^(ruins|archaeological_site)$\"]" + ar;
+                url += tag("historic:ruins") + tag("historic:archaeological_site");
             }
         }
         if (catOn(CAT_VIEWPOINT)) {
-            q += "nwr[tourism~\"^(attraction|viewpoint)$\"]" + ar;
+            url += tag("tourism:attraction") + tag("tourism:viewpoint");
         }
-        var food = "";
-        if (catOn(CAT_RESTAURANT)) { food += "restaurant|"; }
-        if (catOn(CAT_CAFE)) { food += "cafe|fast_food|ice_cream|"; }
-        if (catOn(CAT_BAR)) { food += "bar|pub|biergarten|"; }
-        if (food.length() > 0) {
-            food = food.substring(0, food.length() - 1);
-            q += "nwr[amenity~\"^(" + food + ")$\"]" + ar;
+        if (catOn(CAT_RESTAURANT)) {
+            url += tag("amenity:restaurant");
+        }
+        if (catOn(CAT_CAFE)) {
+            url += tag("amenity:cafe") + tag("amenity:fast_food")
+                 + tag("amenity:ice_cream");
+        }
+        if (catOn(CAT_BAR)) {
+            url += tag("amenity:bar") + tag("amenity:pub") + tag("amenity:biergarten");
         }
         if (catOn(CAT_MUSEUM)) {
-            q += "nwr[tourism~\"^(museum|gallery|artwork)$\"]" + ar;
+            url += tag("tourism:museum") + tag("tourism:gallery")
+                 + tag("tourism:artwork");
         }
         if (catOn(CAT_THEATRE)) {
-            q += "nwr[amenity~\"^(theatre|cinema|arts_centre)$\"]" + ar;
+            url += tag("amenity:theatre") + tag("amenity:cinema")
+                 + tag("amenity:arts_centre");
         }
         if (catOn(CAT_WORSHIP)) {
-            q += "nwr[amenity=place_of_worship]" + ar;
+            url += tag("amenity:place_of_worship");
         }
-        q += ")->.r;.r convert poi ::id=id(),::geom=center(geom()),"
-           + "name=t[\"name\"],h=t[\"historic\"],to=t[\"tourism\"],a=t[\"amenity\"];"
-           + "out geom " + GLANCE_CAP.toString() + ";";
-        return q;
+        return url;
+    }
+
+    private function tag(t as String) as String {
+        return "&osm_tag=" + t;
     }
 
     private function catOn(cat as Number) as Boolean {

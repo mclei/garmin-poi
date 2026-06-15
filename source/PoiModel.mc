@@ -8,16 +8,14 @@ import Toybox.Sensor;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-// Overpass endpoint(s), tried in order with failover. Only overpass-api.de
-// (Germany, EU) is reliably reachable from the watch; the kumi.systems /
-// private.coffee mirrors don't respond from devices and an unreachable host
-// HANGS the request rather than failing fast, so they're excluded. The single
-// canonical instance intermittently returns HTTP 406 (-> -400); the fast
-// same-endpoint retry overcomes that within a few seconds. Add another
-// known-reachable instance here (e.g. a self-hosted one) for redundancy.
-const OVERPASS_MIRRORS = [
-    "https://overpass-api.de/api/interpreter"           // Germany
-] as Array<String>;
+// Land POIs come from Photon (komoot's OSM geocoder). Overpass is a best-effort
+// database query engine whose public instances 406 / rate-limit (and the dead
+// EU mirrors HANG instead of failing fast); Photon's /reverse endpoint is a
+// lightweight "nearby by category" lookup on solid infrastructure - give it a
+// lat/lon, a radius and osm_tag category filters and it returns compact,
+// distance-sorted GeoJSON. application/json is the only text-ish type the watch
+// accepts. Self-host github.com/komoot/photon to change endpoint.
+const PHOTON_URL = "https://photon.komoot.io/reverse";
 
 // Land POIs use an expanding search: start tight and widen only when nothing
 // is found, up to 5 km. The starting radius depends on GPS precision (50 m on
@@ -26,12 +24,11 @@ const OVERPASS_MIRRORS = [
 // far, where there is little to return anyway.
 const POI_RADII = [50, 100, 200, 500, 1000, 2000, 5000] as Array<Number>;
 
-// Hard cap on returned elements, so a dense stopping radius can't produce a
-// response too large to parse. The query uses Overpass `convert` to project
-// only the fields we use (~230 bytes/element), so 60 elements is ~14 KB. We
-// only display the nearest maxPois anyway. No "qt" sort: quadtile order biases
-// the capped set to one corner; plain id order is even and we distance-sort.
-const POI_MAX_ELEMENTS = 60;
+// Cap on returned features (Photon `limit`), so a dense stopping radius can't
+// produce a response too large to parse on-watch. Photon features are ~350
+// bytes each, so 30 is ~11 KB - within the JSON parse budget (50 was ~18 KB,
+// too large). Photon already distance-sorts; we only show the nearest maxPois.
+const POI_MAX_ELEMENTS = 30;
 
 // Keep widening the search until at least this many POIs are found (or the
 // widest radius is reached) - a tight radius returning only a couple of hits
@@ -100,18 +97,9 @@ class PoiModel {
     private var _fetchLon as Double?;
     private var _fetchedMask as Number;  // land categories included in last fetch
     private var _ladderIdx as Number;    // current step in POI_RADII expanding search
-    private var _opIndex as Number;      // current Overpass mirror
-    private var _opTries as Number;      // consecutive failures on this mirror
     private var _oneShotCat as Number;   // temporary "show only this" category, -1 = off
     private var _oneShotPending as Boolean;
     private var _dirty as Boolean;
-
-    // Full-tag cache for the POI detail page (key "type/id" -> tags dict;
-    // "" cached on failure). Fetched on demand when a detail page opens.
-    private var _poiDetail as Dictionary;
-    private var _detailPending as Boolean;
-    private var _detailKey as String?;
-    private var _lastDetailSec as Number;
 
     function initialize() {
         lat = null;
@@ -144,15 +132,9 @@ class PoiModel {
         _fetchLon = null;
         _fetchedMask = 0;
         _ladderIdx = 0;
-        _opIndex = 0;
-        _opTries = 0;
         _oneShotCat = -1;
         _oneShotPending = false;
         _dirty = true;
-        _poiDetail = {} as Dictionary;
-        _detailPending = false;
-        _detailKey = null;
-        _lastDetailSec = 0;
         reloadSettings();
     }
 
@@ -436,7 +418,7 @@ class PoiModel {
         return false;
     }
 
-    // ---- Overpass (OpenStreetMap POIs) ----
+    // ---- Photon (OpenStreetMap POIs) ----
 
     private function maybeFetchPois(now as Number) as Void {
         if (_fetchPending) { return; }
@@ -467,8 +449,8 @@ class PoiModel {
             _dirty = true;
         }
         if (!anyLandCatEnabled()) { return; }
-        // Retry after a transient failure. Short delay because overpass-api.de's
-        // 406s alternate per request, so a quick retry usually succeeds.
+        // Retry after a transient failure (e.g. Photon briefly rate-limiting).
+        // Short delay so a hiccup clears quickly.
         if (poiStatus == STATUS_ERROR && since >= 3) {
             fetchPois();
             return;
@@ -506,71 +488,79 @@ class PoiModel {
             mask |= (1 << CAT_CASTLE) | (1 << CAT_RUINS);
         }
         _fetchedMask = mask;
-        Communications.makeWebRequest(OVERPASS_MIRRORS[_opIndex],
-                                      {"data" => buildQuery(POI_RADII[_ladderIdx])},
-                                      overpassOptions(), method(:onPoiResponse));
+        Communications.makeWebRequest(buildPhotonUrl(POI_RADII[_ladderIdx]),
+                                      {}, httpJsonOptions(), method(:onPoiResponse));
     }
 
-    private function overpassOptions() as Dictionary {
+    private function httpJsonOptions() as Dictionary {
         return {
             :method => Communications.HTTP_REQUEST_METHOD_GET,
             :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
         };
     }
 
-    // JSON output (application/json is the only text-ish type the watch accepts
-    // - CSV is text/csv which gives -400). Overpass `convert` projects only the
-    // fields we use (~230 bytes/element vs ~450 for full tags), keeping the
-    // response small enough to parse; center(geom()) gives way/relation centers.
-    private function buildQuery(radius as Number) as String {
+    // Build the Photon /reverse URL: nearest features within `radius` metres
+    // (Photon takes km), filtered to the enabled categories via osm_tag. Several
+    // osm_tag params are OR'd together; the whole query string is built into the
+    // URL (with an empty params dict) because a request Dictionary can't hold the
+    // repeated osm_tag key.
+    private function buildPhotonUrl(radius as Number) as String {
         var la = (lat as Double).format("%.5f");
         var lo = (lon as Double).format("%.5f");
-        var ar = "(around:" + radius.toString() + "," + la + "," + lo + ");";
-        var q = "[out:json][timeout:25];(";
-        // Historic: a broad nwr[historic] covers monuments/memorials and is
-        // classified down to castles/ruins; if only the narrow toggles are on,
-        // fetch just those subsets.
+        var km = (radius / 1000.0).format("%.3f");
+        var url = PHOTON_URL + "?lat=" + la + "&lon=" + lo
+                + "&radius=" + km + "&limit=" + POI_MAX_ELEMENTS.toString();
+        // Historic: a broad `historic` (key only) covers monuments/memorials and
+        // is classified down to castles/ruins; if only the narrow toggles are on,
+        // request just those subtype values.
         if (effectiveCatEnabled(CAT_MONUMENT)) {
-            q += "nwr[historic]" + ar;
+            url += tag("historic");
         } else {
             if (effectiveCatEnabled(CAT_CASTLE)) {
-                q += "nwr[historic~\"^(castle|fort|fortress|city_gate|citadel|castle_wall|manor|palace)$\"]" + ar;
+                url += tag("historic:castle") + tag("historic:fort")
+                     + tag("historic:fortress") + tag("historic:city_gate")
+                     + tag("historic:citadel") + tag("historic:castle_wall")
+                     + tag("historic:manor") + tag("historic:palace");
             }
             if (effectiveCatEnabled(CAT_RUINS)) {
-                q += "nwr[historic~\"^(ruins|archaeological_site)$\"]" + ar;
+                url += tag("historic:ruins") + tag("historic:archaeological_site");
             }
         }
         if (effectiveCatEnabled(CAT_VIEWPOINT)) {
-            q += "nwr[tourism~\"^(attraction|viewpoint)$\"]" + ar;
+            url += tag("tourism:attraction") + tag("tourism:viewpoint");
         }
-        var food = "";
-        if (effectiveCatEnabled(CAT_RESTAURANT)) { food += "restaurant|"; }
-        if (effectiveCatEnabled(CAT_CAFE)) { food += "cafe|fast_food|ice_cream|"; }
-        if (effectiveCatEnabled(CAT_BAR)) { food += "bar|pub|biergarten|"; }
-        if (food.length() > 0) {
-            food = food.substring(0, food.length() - 1); // drop trailing '|'
-            q += "nwr[amenity~\"^(" + food + ")$\"]" + ar;
+        if (effectiveCatEnabled(CAT_RESTAURANT)) {
+            url += tag("amenity:restaurant");
+        }
+        if (effectiveCatEnabled(CAT_CAFE)) {
+            url += tag("amenity:cafe") + tag("amenity:fast_food")
+                 + tag("amenity:ice_cream");
+        }
+        if (effectiveCatEnabled(CAT_BAR)) {
+            url += tag("amenity:bar") + tag("amenity:pub") + tag("amenity:biergarten");
         }
         if (effectiveCatEnabled(CAT_MUSEUM)) {
-            q += "nwr[tourism~\"^(museum|gallery|artwork)$\"]" + ar;
+            url += tag("tourism:museum") + tag("tourism:gallery")
+                 + tag("tourism:artwork");
         }
         if (effectiveCatEnabled(CAT_THEATRE)) {
-            q += "nwr[amenity~\"^(theatre|cinema|arts_centre)$\"]" + ar;
+            url += tag("amenity:theatre") + tag("amenity:cinema")
+                 + tag("amenity:arts_centre");
         }
         if (effectiveCatEnabled(CAT_WORSHIP)) {
-            q += "nwr[amenity=place_of_worship]" + ar;
+            url += tag("amenity:place_of_worship");
         }
-        q += ")->.r;.r convert poi ::id=id(),tp=type(),::geom=center(geom()),"
-           + "name=t[\"name\"],h=t[\"historic\"],to=t[\"tourism\"],a=t[\"amenity\"];"
-           + "out geom " + POI_MAX_ELEMENTS.toString() + ";";
-        return q;
+        return url;
+    }
+
+    private function tag(t as String) as String {
+        return "&osm_tag=" + t;
     }
 
     function onPoiResponse(code as Number, data as Dictionary or String or Null) as Void {
         _fetchPending = false;
         if (code == 200 && data instanceof Dictionary) {
-            _opTries = 0;
-            var fresh = parseElements(data["elements"]);
+            var fresh = parseElements(data["features"]);
             // Show what this radius found right away, then keep widening in the
             // background if there are still too few. Each wider circle is a
             // superset, so the on-screen list just grows as the steps return -
@@ -581,17 +571,10 @@ class PoiModel {
                 fetchPois();
             }
         } else {
-            // Failure (overpass-api.de intermittently 406s/504s -> -400). Its
-            // failures alternate per request, so retry the SAME mirror a few
-            // times (fast) before rotating to another - that avoids stalling on
-            // a mirror that may be slow/unreachable from the watch.
+            // Transient failure (Photon rate-limiting, or -104 no phone).
+            // maybeFetchPois retries shortly; the status line shows "retrying...".
             poiStatus = STATUS_ERROR;
             poiError = code;
-            _opTries++;
-            if (_opTries >= 3) {
-                _opIndex = (_opIndex + 1) % OVERPASS_MIRRORS.size();
-                _opTries = 0;
-            }
         }
         WatchUi.requestUpdate();
     }
@@ -613,17 +596,18 @@ class PoiModel {
         poiError = 0;
     }
 
-    // Parse the projected `convert` output. Each element is:
-    //   {type:"poi", id:<origId>, geometry:{coordinates:[lon,lat]},
-    //    tags:{tp:<node|way|relation>, name, h, to, a}}
-    private function parseElements(elements) as Array<Poi> {
+    // Parse Photon's GeoJSON FeatureCollection. Each feature is:
+    //   {geometry:{coordinates:[lon,lat]},
+    //    properties:{osm_type:"N"/"W"/"R", osm_id, osm_key, osm_value, name,
+    //                street, housenumber, city, postcode, ...}}
+    private function parseElements(features) as Array<Poi> {
         var out = [] as Array<Poi>;
-        if (!(elements instanceof Array)) { return out; }
-        for (var i = 0; i < elements.size(); i++) {
-            var el = elements[i];
+        if (!(features instanceof Array)) { return out; }
+        for (var i = 0; i < features.size(); i++) {
+            var el = features[i];
             if (!(el instanceof Dictionary)) { continue; }
-            var tags = el["tags"];
-            if (!(tags instanceof Dictionary)) { continue; }
+            var props = el["properties"];
+            if (!(props instanceof Dictionary)) { continue; }
             var geom = el["geometry"];
             if (!(geom instanceof Dictionary)) { continue; }
             var coords = geom["coordinates"];
@@ -631,17 +615,16 @@ class PoiModel {
             var plon = numToD(coords[0]);   // GeoJSON order is [lon, lat]
             var plat = numToD(coords[1]);
             if (plat == null || plon == null) { continue; }
-            var cd = categorizeTags(strOf(tags["h"]),
-                                    strOf(tags["to"]),
-                                    strOf(tags["a"]));
+            var cd = categorizeKv(strOf(props["osm_key"]), strOf(props["osm_value"]));
             if (cd == null) { continue; }
             var subtype = prettify(cd[1] as String);
-            var name = strOf(tags["name"]);
+            var name = strOf(props["name"]);
             if (name.length() == 0) { name = subtype; }
             var p = new Poi(name, plat, plon, cd[0] as Number, subtype);
-            p.osmType = strOf(tags["tp"]);
-            var idv = el["id"];
+            p.osmType = strOf(props["osm_type"]);
+            var idv = props["osm_id"];
             p.osmId = (idv != null) ? idv.toString() : "";
+            p.addr = joinAddr(props);
             out.add(p);
         }
         return out;
@@ -651,42 +634,61 @@ class PoiModel {
         return (v instanceof String) ? v : "";
     }
 
-    // Classify from the historic/tourism/amenity column values (empty = absent).
-    private function categorizeTags(h as String, t as String, a as String) as Array? {
-        if (h.length() > 0) {
-            if (h.equals("castle") || h.equals("fort") || h.equals("fortress")
-                || h.equals("city_gate") || h.equals("citadel")
-                || h.equals("castle_wall") || h.equals("manor")
-                || h.equals("palace")) {
-                return [CAT_CASTLE, h];
-            }
-            if (h.equals("ruins") || h.equals("archaeological_site")) {
-                return [CAT_RUINS, h];
-            }
-            return [CAT_MONUMENT, h]; // monuments, memorials, other historic
+    // Join Photon's address fields into "Street 12, City".
+    private function joinAddr(props as Dictionary) as String {
+        var street = strOf(props["street"]);
+        var num = strOf(props["housenumber"]);
+        var city = strOf(props["city"]);
+        var s = "";
+        if (street.length() > 0) {
+            s = street;
+            if (num.length() > 0) { s += " " + num; }
         }
-        if (t.length() > 0) {
-            if (t.equals("attraction") || t.equals("viewpoint")) {
-                return [CAT_VIEWPOINT, t];
+        if (city.length() > 0) {
+            if (s.length() > 0) { s += ", "; }
+            s += city;
+        }
+        return s;
+    }
+
+    // Classify from Photon's osm_key / osm_value (empty = absent).
+    private function categorizeKv(key as String, value as String) as Array? {
+        if (key.equals("historic")) {
+            if (value.equals("castle") || value.equals("fort")
+                || value.equals("fortress") || value.equals("city_gate")
+                || value.equals("citadel") || value.equals("castle_wall")
+                || value.equals("manor") || value.equals("palace")) {
+                return [CAT_CASTLE, value];
             }
-            if (t.equals("museum") || t.equals("gallery") || t.equals("artwork")) {
-                return [CAT_MUSEUM, t];
+            if (value.equals("ruins") || value.equals("archaeological_site")) {
+                return [CAT_RUINS, value];
+            }
+            return [CAT_MONUMENT, value]; // monuments, memorials, other historic
+        }
+        if (key.equals("tourism")) {
+            if (value.equals("attraction") || value.equals("viewpoint")) {
+                return [CAT_VIEWPOINT, value];
+            }
+            if (value.equals("museum") || value.equals("gallery")
+                || value.equals("artwork")) {
+                return [CAT_MUSEUM, value];
             }
         }
-        if (a.length() > 0) {
-            if (a.equals("restaurant")) { return [CAT_RESTAURANT, a]; }
-            if (a.equals("cafe") || a.equals("fast_food")
-                || a.equals("ice_cream")) {
-                return [CAT_CAFE, a];
+        if (key.equals("amenity")) {
+            if (value.equals("restaurant")) { return [CAT_RESTAURANT, value]; }
+            if (value.equals("cafe") || value.equals("fast_food")
+                || value.equals("ice_cream")) {
+                return [CAT_CAFE, value];
             }
-            if (a.equals("bar") || a.equals("pub") || a.equals("biergarten")) {
-                return [CAT_BAR, a];
+            if (value.equals("bar") || value.equals("pub")
+                || value.equals("biergarten")) {
+                return [CAT_BAR, value];
             }
-            if (a.equals("theatre") || a.equals("cinema")
-                || a.equals("arts_centre")) {
-                return [CAT_THEATRE, a];
+            if (value.equals("theatre") || value.equals("cinema")
+                || value.equals("arts_centre")) {
+                return [CAT_THEATRE, value];
             }
-            if (a.equals("place_of_worship")) { return [CAT_WORSHIP, a]; }
+            if (value.equals("place_of_worship")) { return [CAT_WORSHIP, value]; }
         }
         return null;
     }
@@ -723,58 +725,6 @@ class PoiModel {
             out = out.substring(0, 1).toUpper() + out.substring(1, out.length());
         }
         return out;
-    }
-
-    // ---- POI detail (full OSM tags for the detail page) ----
-
-    private function detailKeyFor(p as Poi) as String? {
-        if (p.osmType.length() == 0 || p.osmId.length() == 0) { return null; }
-        return p.osmType + "/" + p.osmId;
-    }
-
-    // Full tag dictionary for a POI, or null if not fetched yet.
-    function poiDetail(p as Poi) as Dictionary? {
-        var key = detailKeyFor(p);
-        if (key == null) { return null; }
-        var v = _poiDetail.get(key);
-        return (v instanceof Dictionary) ? v : null;
-    }
-
-    // Fetch the focused element's full tags on demand. No-op if already loaded,
-    // a request is in flight, or it was attempted very recently.
-    function requestPoiDetail(p as Poi) as Void {
-        var key = detailKeyFor(p);
-        if (key == null) { return; }
-        if (_poiDetail.get(key) != null) { return; }
-        if (_fetchPending || _detailPending) { return; }
-        var now = Time.now().value();
-        if (now - _lastDetailSec < 4) { return; }
-        _detailPending = true;
-        _lastDetailSec = now;
-        _detailKey = key;
-        var q = "[out:json][timeout:25];" + p.osmType + "(" + p.osmId + ");out tags;";
-        Communications.makeWebRequest(OVERPASS_MIRRORS[_opIndex], {"data" => q},
-                                      overpassOptions(), method(:onDetailResponse));
-    }
-
-    function onDetailResponse(code as Number, data as Dictionary or String or Null) as Void {
-        _detailPending = false;
-        var key = _detailKey;
-        _detailKey = null;
-        if (key == null) { return; }
-        if (code == 200 && data instanceof Dictionary) {
-            var tags = {} as Dictionary;
-            var elements = data["elements"];
-            if (elements instanceof Array && elements.size() > 0) {
-                var el = elements[0];
-                if (el instanceof Dictionary && el["tags"] instanceof Dictionary) {
-                    tags = el["tags"];
-                }
-            }
-            _poiDetail.put(key, tags); // store (possibly empty) = loaded
-        }
-        // On transient failure, leave it unset so the detail page retries.
-        WatchUi.requestUpdate();
     }
 
     // ---- helpers ----

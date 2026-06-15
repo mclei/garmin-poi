@@ -1,6 +1,6 @@
 import Toybox.Lang;
 
-// POI categories, all fetched from OpenStreetMap via Overpass. The order here
+// POI categories, all fetched from OpenStreetMap via Photon. The order here
 // must match the parallel arrays in module PoiCat and the defaults in PoiModel.
 const CAT_MONUMENT   = 0;  // historic catch-all: monuments, memorials, other historic
 const CAT_CASTLE     = 1;  // castles, forts, city gates, palaces
@@ -29,8 +29,9 @@ class Poi {
     public var detail as String;    // subtype, e.g. "Castle"
     public var distance as Float;   // meters from current position
     public var bearing as Float;    // degrees true, 0..360
-    public var osmType as String;   // "node"/"way"/"relation" (for detail fetch)
-    public var osmId as String;     // OSM element id (for detail fetch)
+    public var osmType as String;   // "N"/"W"/"R" from Photon (OSM element type)
+    public var osmId as String;     // OSM element id
+    public var addr as String;      // joined street address (from Photon), may be ""
     public var inView as Boolean;   // currently inside the field-of-view cone (hysteresis)
 
     function initialize(aName as String, aLat as Double, aLon as Double,
@@ -44,6 +45,7 @@ class Poi {
         bearing = 0.0;
         osmType = "";
         osmId = "";
+        addr = "";
         inView = false;
     }
 }

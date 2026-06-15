@@ -197,7 +197,7 @@ class MainView extends WatchUi.View {
             s += WatchUi.loadResource(Rez.Strings.Loading);
         } else if (_model.poiStatus == STATUS_ERROR) {
             // -104 = no phone/internet: actionable, won't self-heal, so name it.
-            // Everything else (overpass 406/504 -> -400) is transient and the
+            // Everything else (Photon rate-limiting -> -400) is transient and the
             // app is already retrying, so don't alarm with a raw code.
             s += (_model.poiError == -104) ? "no phone" : "retrying...";
         } else {

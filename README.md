@@ -44,9 +44,9 @@ SDK Manager.
   (about 10), or reaches 5 km. A tight radius with only a hit or two keeps
   widening so you get a useful set, not just the single closest thing. The starting radius tracks GPS precision: **50 m** on a good
   fix, ~200 m on a usable one, ~500 m while the position is still approximate —
-  so a precise fix in a city shows exactly what's right in front of you. The
-  query uses Overpass `convert` to return only the fields it needs, keeping the
-  response small enough to parse on-watch.
+  so a precise fix in a city shows exactly what's right in front of you. POIs
+  come from Photon's `/reverse` endpoint with `osm_tag` category filters, which
+  returns a compact, distance-sorted result small enough to parse on-watch.
 - **Fast start** — on launch the app seeds from the cached last-known position
   so POIs load immediately while the GPS warms up. The status line shows a
   leading `~` until a precise fix arrives, then the list is refined to it.
@@ -62,7 +62,7 @@ SDK Manager.
 
 | Data | Source | Notes |
 |------|--------|-------|
-| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Uses the main EU instance `overpass-api.de`. It intermittently returns a 406 (surfacing as `-400`) on roughly half of requests, so a failed request is simply retried — that overcomes it within a second or two. (Other public mirrors — `kumi.systems`, `private.coffee` — proved unreachable *from the watch* and an unreachable host *hangs* with no fast fail, so they were removed: a dead mirror would freeze the app on "Loading places".) The query uses Overpass `convert` to project only the needed fields → compact `application/json` (CSV would be smaller but the watch rejects `text/csv`). Fetched at most every ~60 s and after moving >400 m. Edit `OVERPASS_MIRRORS` in `source/PoiModel.mc` to change the endpoint. |
+| Land POIs | [Photon](https://photon.komoot.io) (OpenStreetMap) | Photon's `/reverse` endpoint is a lightweight "nearby by category" lookup: given lat/lon, a radius, and `osm_tag` category filters it returns compact, distance-sorted GeoJSON (`application/json` — the only text-ish type the watch accepts). Chosen over Overpass, which is a heavyweight database query engine whose public instances frequently 406/rate-limit (and whose dead EU mirrors *hang* with no fast fail, freezing the app on "Loading places"). Fetched at most every ~60 s and after moving >400 m, capped at 30 features per request to stay within the on-watch JSON parse budget. Edit `PHOTON_URL` in `source/PoiModel.mc` to point at a self-hosted [komoot/photon](https://github.com/komoot/photon) instance. |
 
 Requests go through the **paired phone** (Garmin Connect Mobile must be
 running with internet access). Without the phone you'll see error `-104`.
@@ -80,7 +80,7 @@ resources/              strings, properties, settings UI, launcher icon
 scripts/make_icon.py    regenerates the launcher icon (stdlib-only Python)
 source/
   AheadApp.mc           app entry point
-  PoiModel.mc           GPS, compass, Overpass fetching, state
+  PoiModel.mc           GPS, compass, Photon fetching, state
   Poi.mc                POI class, categories
   GeoUtils.mc           distance/bearing math, formatting
   MainView.mc           compass/radar screen
@@ -127,7 +127,7 @@ monkeydo Ahead.prg venux1
 ```
 
 In the simulator use *Simulation → Locations* to set a GPS position
-(pick a city center so Overpass returns plenty of POIs).
+(pick a city center so Photon returns plenty of POIs).
 
 ### 5. Sideload to the watch
 
@@ -138,7 +138,7 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 
 | Input | Action |
 |-------|--------|
-| **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: full description, address, hours, website, …) |
+| **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: name, type, distance/bearing, street address and coordinates — all from the Photon result, no extra request) |
 | **Swipe in from the right edge** | Filters menu (settings) — category toggles + "Refresh now" |
 | **Swipe down** | Quick "show only one category" — a one-shot (e.g. just restaurants, or just museums) that does **not** change your saved filters; the next normal search reverts to them |
 | Swipe up | Nearest-POI list; select an entry opens its detail page. The first row toggles the field-of-view filter, so you can list POIs in **all directions** (including behind you), not just those ahead |
@@ -193,7 +193,7 @@ and push — the workflow runs automatically.
 
 | Symptom | Cause |
 |---------|-------|
-| Status shows `retrying...` | A request to overpass-api.de failed transiently (it 406s on ~half of requests, surfacing as -400). The app just retries and it clears within a second or two. |
+| Status shows `retrying...` | A Photon request failed transiently (e.g. brief rate-limiting, surfacing as `-400`). The app just retries and it clears within a second or two. |
 | Status shows `no phone` | Watch not connected to the phone / no internet (`-104`) — this one needs you to act. |
 | `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
 | Arrow points the wrong way / compass frozen | Open Filters → **Calibrate compass** and wave the watch in a figure-8 until "N" points north. (The OS auto-calibrates from the motion; Connect IQ can't trigger calibration directly. If it stays wrong, recalibrate in the watch's system Sensors settings.) |

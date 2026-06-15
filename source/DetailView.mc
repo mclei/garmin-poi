@@ -1,18 +1,16 @@
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.System;
-import Toybox.Timer;
 import Toybox.WatchUi;
 
-// Scrollable detail page for one POI / aircraft. Pulls richer data on demand
-// (full OSM tags for places; type + route for aircraft) and word-wraps it.
+// Scrollable detail page for one POI: name, type, distance/bearing and the
+// address (all carried from the Photon result, no extra fetch), word-wrapped.
 class DetailView extends WatchUi.View {
 
     private var _model as PoiModel;
     private var _poi as Poi;
     private var _scroll as Number;
     private var _maxScroll as Number;
-    private var _timer as Timer.Timer?;
 
     function initialize(model as PoiModel, poi as Poi) {
         View.initialize();
@@ -20,28 +18,6 @@ class DetailView extends WatchUi.View {
         _poi = poi;
         _scroll = 0;
         _maxScroll = 0;
-        _timer = null;
-    }
-
-    function onShow() as Void {
-        var t = new Timer.Timer();
-        t.start(method(:onTick), 500, true);
-        _timer = t;
-        onTick();
-    }
-
-    function onHide() as Void {
-        var t = _timer;
-        if (t != null) { t.stop(); _timer = null; }
-    }
-
-    function onTick() as Void {
-        _model.requestPoiDetail(_poi);
-        if (_model.poiDetail(_poi) != null) {
-            var t = _timer;
-            if (t != null) { t.stop(); _timer = null; }
-        }
-        WatchUi.requestUpdate();
     }
 
     function scrollBy(dy as Number) as Void {
@@ -172,59 +148,13 @@ class DetailView extends WatchUi.View {
                Graphics.FONT_XTINY, Graphics.COLOR_LT_GRAY]);
         b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
 
-        var tags = _model.poiDetail(_poi);
-        if (tags == null) {
-            b.add(["Loading details...", Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
-        } else {
-            var n0 = b.size();
-            addField(b, "", tagStr(tags, "description"));
-            var addr = joinAddr(tags);
-            addField(b, "Address", addr);
-            addField(b, "Hours", tagStr(tags, "opening_hours"));
-            addField(b, "Cuisine", tagStr(tags, "cuisine"));
-            var phone = tagStr(tags, "phone");
-            if (phone.length() == 0) { phone = tagStr(tags, "contact:phone"); }
-            addField(b, "Phone", phone);
-            var web = tagStr(tags, "website");
-            if (web.length() == 0) { web = tagStr(tags, "contact:website"); }
-            addField(b, "Web", web);
-            addField(b, "Wikipedia", tagStr(tags, "wikipedia"));
-            addField(b, "Elevation", tagStr(tags, "ele"));
-            if (b.size() == n0) {
-                b.add(["No extra details available",
-                       Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
-            }
+        if (_poi.addr.length() > 0) {
+            b.add(["Address: " + _poi.addr,
+                   Graphics.FONT_XTINY, Graphics.COLOR_WHITE]);
+            b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
         }
-        b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
         b.add([_poi.lat.format("%.5f") + ", " + _poi.lon.format("%.5f"),
                Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
-    }
-
-    private function addField(b as Array, label as String, value as String) as Void {
-        if (value == null || value.length() == 0) { return; }
-        var text = (label.length() > 0) ? (label + ": " + value) : value;
-        b.add([text, Graphics.FONT_XTINY, Graphics.COLOR_WHITE]);
-    }
-
-    private function tagStr(d as Dictionary, key as String) as String {
-        var v = d[key];
-        return (v instanceof String) ? v : "";
-    }
-
-    private function joinAddr(tags as Dictionary) as String {
-        var street = tagStr(tags, "addr:street");
-        var num = tagStr(tags, "addr:housenumber");
-        var city = tagStr(tags, "addr:city");
-        var s = "";
-        if (street.length() > 0) {
-            s = street;
-            if (num.length() > 0) { s += " " + num; }
-        }
-        if (city.length() > 0) {
-            if (s.length() > 0) { s += ", "; }
-            s += city;
-        }
-        return s;
     }
 
     // Greedy word-wrap to maxW pixels.
