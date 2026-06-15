@@ -8,14 +8,15 @@ import Toybox.Sensor;
 import Toybox.Time;
 import Toybox.WatchUi;
 
-// Global Overpass mirrors (all EU-based, all carry worldwide data), tried in
-// order with failover (each is retried a few times, then we rotate).
-// overpass-api.de is the canonical instance but intermittently returns HTTP 406
-// (-> -400), which the per-mirror retry handles before failing over.
+// Overpass endpoint(s), tried in order with failover. Only overpass-api.de
+// (Germany, EU) is reliably reachable from the watch; the kumi.systems /
+// private.coffee mirrors don't respond from devices and an unreachable host
+// HANGS the request rather than failing fast, so they're excluded. The single
+// canonical instance intermittently returns HTTP 406 (-> -400); the fast
+// same-endpoint retry overcomes that within a few seconds. Add another
+// known-reachable instance here (e.g. a self-hosted one) for redundancy.
 const OVERPASS_MIRRORS = [
-    "https://overpass-api.de/api/interpreter",          // Germany
-    "https://overpass.kumi.systems/api/interpreter",    // Austria
-    "https://overpass.private.coffee/api/interpreter"   // Austria
+    "https://overpass-api.de/api/interpreter"           // Germany
 ] as Array<String>;
 
 // Land POIs use an expanding search: start tight and widen only when nothing

@@ -196,7 +196,10 @@ class MainView extends WatchUi.View {
         } else if (_model.poiStatus == STATUS_LOADING) {
             s += WatchUi.loadResource(Rez.Strings.Loading);
         } else if (_model.poiStatus == STATUS_ERROR) {
-            s += "POI err " + _model.poiError.toString();
+            // -104 = no phone/internet: actionable, won't self-heal, so name it.
+            // Everything else (overpass 406/504 -> -400) is transient and the
+            // app is already retrying, so don't alarm with a raw code.
+            s += (_model.poiError == -104) ? "no phone" : "retrying...";
         } else {
             s += _model.visible.size().toString() + " POI";
         }

@@ -62,7 +62,7 @@ SDK Manager.
 
 | Data | Source | Notes |
 |------|--------|-------|
-| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Tried in order with failover, all EU instances: `overpass-api.de` → `kumi.systems` → `private.coffee`, each retried a few times before rotating. The query uses Overpass `convert` to project only the needed fields → compact `application/json` (CSV would be smaller but the watch rejects `text/csv`). Fetched at most every ~60 s and after moving >400 m. Edit `OVERPASS_MIRRORS` in `source/PoiModel.mc` to change the list. |
+| Land POIs | [Overpass API](https://overpass-api.de) (OpenStreetMap) | Uses the main EU instance `overpass-api.de`. It intermittently returns a 406 (surfacing as `-400`) on roughly half of requests, so a failed request is simply retried — that overcomes it within a second or two. (Other public mirrors — `kumi.systems`, `private.coffee` — proved unreachable *from the watch* and an unreachable host *hangs* with no fast fail, so they were removed: a dead mirror would freeze the app on "Loading places".) The query uses Overpass `convert` to project only the needed fields → compact `application/json` (CSV would be smaller but the watch rejects `text/csv`). Fetched at most every ~60 s and after moving >400 m. Edit `OVERPASS_MIRRORS` in `source/PoiModel.mc` to change the endpoint. |
 
 Requests go through the **paired phone** (Garmin Connect Mobile must be
 running with internet access). Without the phone you'll see error `-104`.
@@ -193,8 +193,8 @@ and push — the workflow runs automatically.
 
 | Symptom | Cause |
 |---------|-------|
-| `POI err -104` | Watch not connected to the phone / no internet |
-| `POI err 406` / `-400` / `504` / `429` | A mirror failed (overpass-api.de 406s a lot, which surfaces as -400). The app fails over to the next mirror and retries; usually transient. |
+| Status shows `retrying...` | A request to overpass-api.de failed transiently (it 406s on ~half of requests, surfacing as -400). The app just retries and it clears within a second or two. |
+| Status shows `no phone` | Watch not connected to the phone / no internet (`-104`) — this one needs you to act. |
 | `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
 | Arrow points the wrong way / compass frozen | Open Filters → **Calibrate compass** and wave the watch in a figure-8 until "N" points north. (The OS auto-calibrates from the motion; Connect IQ can't trigger calibration directly. If it stays wrong, recalibrate in the watch's system Sensors settings.) |
 
