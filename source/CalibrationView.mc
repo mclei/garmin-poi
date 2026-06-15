@@ -5,10 +5,9 @@ import Toybox.Sensor;
 import Toybox.Timer;
 import Toybox.WatchUi;
 
-// Compass-calibration helper. Connect IQ can't trigger the system magnetometer
-// calibration, but it recalibrates automatically as the watch is moved through
-// varied orientations - so this screen guides the figure-8 motion and shows the
-// live heading so you can watch it settle and confirm it points the right way.
+// Connect IQ apps cannot trigger the system compass calibration (apps can only
+// read the heading), so this screen points the user to the watch's built-in
+// calibration and shows the live heading so they can verify the result after.
 class CalibrationView extends WatchUi.View {
 
     private var _model as PoiModel;
@@ -26,7 +25,7 @@ class CalibrationView extends WatchUi.View {
 
     function onShow() as Void {
         var t = new Timer.Timer();
-        t.start(method(:onTick), 150, true);
+        t.start(method(:onTick), 200, true);
         _timer = t;
         onTick();
     }
@@ -34,7 +33,6 @@ class CalibrationView extends WatchUi.View {
     function onHide() as Void {
         var t = _timer;
         if (t != null) { t.stop(); _timer = null; }
-        // Hand the freshly-calibrated heading back to the main model.
         if (_have) { _model.headingDeg = _heading; }
     }
 
@@ -59,40 +57,33 @@ class CalibrationView extends WatchUi.View {
 
         // title
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - (ring * 0.78).toNumber(), Graphics.FONT_XTINY,
-                    "COMPASS",
+        dc.drawText(cx, cy - (ring * 0.62).toNumber(), Graphics.FONT_XTINY,
+                    "CALIBRATE COMPASS",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // compass dial: a small ring with a North marker that rotates with you
-        var dialR = (ring * 0.34).toNumber();
-        var dy = cy - (ring * 0.30).toNumber();
-        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(2);
-        dc.drawCircle(cx, dy, dialR);
-        dc.setPenWidth(1);
-        var a = Math.toRadians(GeoUtils.normDeg(-_heading));   // North relative to heading
-        var nx = cx + (dialR - 10) * Math.sin(a);
-        var ny = dy - (dialR - 10) * Math.cos(a);
-        dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(nx.toNumber(), ny.toNumber(), Graphics.FONT_TINY, "N",
+        // the app can't do it - point to the system calibration
+        dc.drawText(cx, cy - (ring * 0.42).toNumber(), Graphics.FONT_XTINY,
+                    "Do it in watch settings:",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - (ring * 0.22).toNumber(), Graphics.FONT_TINY,
+                    "Settings > System >",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, cy - (ring * 0.06).toNumber(), Graphics.FONT_TINY,
+                    "Compass > Calibrate",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // live heading readout
+        // live heading so the result can be verified after calibrating
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy + (ring * 0.18).toNumber(), Graphics.FONT_XTINY,
+                    "heading now",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         var hdgText = _have
             ? (_heading.toNumber().toString() + " " + GeoUtils.cardinal(_heading))
             : "--";
-        dc.drawText(cx, cy + (ring * 0.10).toNumber(), Graphics.FONT_NUMBER_MILD,
+        dc.drawText(cx, cy + (ring * 0.38).toNumber(), Graphics.FONT_NUMBER_MILD,
                     hdgText,
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-
-        // instruction
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy + (ring * 0.40).toNumber(), Graphics.FONT_XTINY,
-                    "Wave in a figure-8",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx, cy + (ring * 0.55).toNumber(), Graphics.FONT_XTINY,
-                    "until N points north",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }
