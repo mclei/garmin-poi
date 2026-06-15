@@ -99,6 +99,33 @@ class DetailView extends WatchUi.View {
         }
 
         drawScrollbar(dc, w, h, total);
+        drawLockBadge(dc, w);
+    }
+
+    // Always-visible badge showing whether this POI is the locked target.
+    private function drawLockBadge(dc as Dc, w as Number) as Void {
+        var locked = (_model.targetPoi == _poi);
+        var txt = locked ? "LOCKED" : "UNLOCKED";
+        var font = Graphics.FONT_XTINY;
+        var tw = dc.getTextWidthInPixels(txt, font);
+        var fh = dc.getFontHeight(font);
+        var bw = tw + 12;
+        var bh = fh + 4;
+        // Leave room for the scrollbar (3px wide at w - 4).
+        var bx = w - bw - 8;
+        var by = 4;
+        // Mask the content underneath so the badge stays legible.
+        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
+        dc.fillRectangle(bx - 2, by - 2, bw + 4, bh + 4);
+        if (locked) {
+            dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
+            dc.fillRoundedRectangle(bx, by, bw, bh, 4);
+            dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
+        } else {
+            dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawRoundedRectangle(bx, by, bw, bh, 4);
+        }
+        dc.drawText(bx + 6, by + 2, font, txt, Graphics.TEXT_JUSTIFY_LEFT);
     }
 
     private function drawScrollbar(dc as Dc, w as Number, h as Number,
