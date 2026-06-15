@@ -55,36 +55,64 @@ class CalibrationView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
 
-        // title
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - (ring * 0.62).toNumber(), Graphics.FONT_XTINY,
-                    "CALIBRATE COMPASS",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        // Full rotating compass (like the main view) so the user can see the
+        // heading respond and verify N points the right way after calibrating.
+        drawCompassRing(dc, cx, cy, ring);
 
-        // the app can't do it - point to the system calibration
-        dc.drawText(cx, cy - (ring * 0.42).toNumber(), Graphics.FONT_XTINY,
-                    "Do it in watch settings:",
+        // Calibration instructions in the centre of the compass.
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy - (ring * 0.34).toNumber(), Graphics.FONT_XTINY,
+                    "CALIBRATE IN",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy - (ring * 0.22).toNumber(), Graphics.FONT_TINY,
-                    "Settings > System >",
+        dc.drawText(cx, cy - (ring * 0.15).toNumber(), Graphics.FONT_TINY,
+                    "Settings > System",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx, cy - (ring * 0.06).toNumber(), Graphics.FONT_TINY,
-                    "Compass > Calibrate",
+        dc.drawText(cx, cy, Graphics.FONT_TINY,
+                    "> Compass > Calibrate",
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-        // live heading so the result can be verified after calibrating
+        // live heading readout for precise verification
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cy + (ring * 0.18).toNumber(), Graphics.FONT_XTINY,
-                    "heading now",
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         var hdgText = _have
             ? (_heading.toNumber().toString() + " " + GeoUtils.cardinal(_heading))
             : "--";
-        dc.drawText(cx, cy + (ring * 0.38).toNumber(), Graphics.FONT_NUMBER_MILD,
+        dc.drawText(cx, cy + (ring * 0.22).toNumber(), Graphics.FONT_XTINY,
                     hdgText,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // Rotating compass ring with N/E/S/W and 45-deg ticks (same as MainView).
+    private function drawCompassRing(dc as Dc, cx as Number, cy as Number,
+                                     ring as Number) as Void {
+        var hdg = _have ? _heading : 0.0;
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawCircle(cx, cy, ring);
+        dc.setPenWidth(1);
+        var labels = ["N", "E", "S", "W"];
+        for (var deg = 0; deg < 360; deg += 45) {
+            var a = Math.toRadians(GeoUtils.normDeg((deg - hdg).toFloat()));
+            var sx = Math.sin(a);
+            var sy = Math.cos(a);
+            if (deg % 90 == 0) {
+                var lx = cx + (ring - 18) * sx;
+                var ly = cy - (ring - 18) * sy;
+                dc.setColor((deg == 0) ? Graphics.COLOR_RED : Graphics.COLOR_LT_GRAY,
+                            Graphics.COLOR_TRANSPARENT);
+                dc.drawText(lx.toNumber(), ly.toNumber(), Graphics.FONT_TINY,
+                            labels[deg / 90],
+                            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            } else {
+                dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+                var x1 = cx + (ring - 8) * sx;
+                var y1 = cy - (ring - 8) * sy;
+                var x2 = cx + ring * sx;
+                var y2 = cy - ring * sy;
+                dc.drawLine(x1.toNumber(), y1.toNumber(),
+                            x2.toNumber(), y2.toNumber());
+            }
+        }
     }
 }
 
