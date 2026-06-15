@@ -15,6 +15,7 @@ const GLANCE_CAP = 20;
 const GLANCE_FOV = 45.0;     // pick the nearest place within this cone ahead
 const SCROLL_STEP = 4;       // px per 200 ms tick for the marquee
 const SCROLL_GAP = 28;       // px gap between marquee repeats
+const SCROLL_HOLD = 10;      // ticks to hold at the start before scrolling (~2 s)
 const PICK_TICKS = 5;        // re-pick by heading every Nth tick (~1 s)
 
 // Glance states
@@ -47,6 +48,7 @@ class AheadGlance extends WatchUi.GlanceView {
     private var _heading as Float;
     private var _haveHeading as Boolean;
     private var _scroll as Number;
+    private var _hold as Number;     // ticks remaining to hold before scrolling
     private var _ticks as Number;
     private var _timer as Timer.Timer?;
 
@@ -65,6 +67,7 @@ class AheadGlance extends WatchUi.GlanceView {
         _heading = 0.0;
         _haveHeading = false;
         _scroll = 0;
+        _hold = SCROLL_HOLD;
         _ticks = 0;
         _timer = null;
     }
@@ -89,7 +92,12 @@ class AheadGlance extends WatchUi.GlanceView {
             readHeading();
             pickFocused();
         }
-        _scroll += SCROLL_STEP;
+        // Hold at the start (so the beginning is readable), then scroll.
+        if (_hold > 0) {
+            _hold -= 1;
+        } else {
+            _scroll += SCROLL_STEP;
+        }
         WatchUi.requestUpdate();
     }
 
@@ -188,7 +196,10 @@ class AheadGlance extends WatchUi.GlanceView {
             }
         }
         if (best >= 0) {
-            if (!_names[best].equals(_name)) { _scroll = 0; }  // restart marquee
+            if (!_names[best].equals(_name)) {
+                _scroll = 0;            // restart marquee at the beginning
+                _hold = SCROLL_HOLD;    // and hold ~2 s so it's readable
+            }
             _name = _names[best];
             _dist = _dists[best];
             _state = G_OK;
