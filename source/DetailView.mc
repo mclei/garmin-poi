@@ -86,31 +86,25 @@ class DetailView extends WatchUi.View {
         drawLockBadge(dc, w, round);
     }
 
-    // Always-visible badge showing whether this POI is the locked target.
+    // Small red "L" shown at the top only while this POI is the locked target
+    // (unlocked needs no marker - the footer line states the state). Placed in
+    // the always-visible zone: top-centre on round (corners are clipped), top-
+    // right on square, above where the name text sits so it doesn't cover it.
     private function drawLockBadge(dc as Dc, w as Number, round as Boolean) as Void {
-        var locked = (_model.targetPoi == _poi);
-        var txt = locked ? "LOCKED" : "UNLOCKED";
-        var font = Graphics.FONT_XTINY;
+        if (_model.targetPoi != _poi) { return; }
+        var txt = "L";
+        var font = Graphics.FONT_SMALL;
         var tw = dc.getTextWidthInPixels(txt, font);
         var fh = dc.getFontHeight(font);
-        var bw = tw + 12;
-        var bh = fh + 4;
-        // Round: centre at the top (corners are clipped). Rectangular: top-right
-        // (leaving room for the scrollbar at w - 4).
-        var bx = round ? ((w - bw) / 2) : (w - bw - 8);
-        var by = round ? 18 : 4;
-        // Mask the content underneath so the badge stays legible.
+        var cx = round ? (w / 2) : (w - tw / 2 - 12);
+        var cy = round ? ((dc.getHeight() * 0.06).toNumber() + fh / 2)
+                       : (4 + fh / 2);
+        // Mask the glyph footprint so it stays legible over any text under it.
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(bx - 2, by - 2, bw + 4, bh + 4);
-        if (locked) {
-            dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
-            dc.fillRoundedRectangle(bx, by, bw, bh, 4);
-            dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
-        } else {
-            dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawRoundedRectangle(bx, by, bw, bh, 4);
-        }
-        dc.drawText(bx + 6, by + 2, font, txt, Graphics.TEXT_JUSTIFY_LEFT);
+        dc.fillRectangle(cx - tw / 2 - 3, cy - fh / 2 - 1, tw + 6, fh + 2);
+        dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cy, font, txt,
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function drawScrollbar(dc as Dc, w as Number, h as Number,
