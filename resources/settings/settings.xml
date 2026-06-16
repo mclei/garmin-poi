@@ -4,6 +4,9 @@
         <settingConfig type="numeric" min="10" max="100"/>
     </setting>
 
+    <setting propertyKey="@Properties.catViewpoint" title="@Strings.CatViewpoint">
+        <settingConfig type="boolean"/>
+    </setting>
     <setting propertyKey="@Properties.catMonument" title="@Strings.CatMonument">
         <settingConfig type="boolean"/>
     </setting>
@@ -13,16 +16,13 @@
     <setting propertyKey="@Properties.catRuins" title="@Strings.CatRuins">
         <settingConfig type="boolean"/>
     </setting>
-    <setting propertyKey="@Properties.catViewpoint" title="@Strings.CatViewpoint">
+    <setting propertyKey="@Properties.catWorship" title="@Strings.CatWorship">
         <settingConfig type="boolean"/>
     </setting>
     <setting propertyKey="@Properties.catMuseum" title="@Strings.CatMuseum">
         <settingConfig type="boolean"/>
     </setting>
     <setting propertyKey="@Properties.catTheatre" title="@Strings.CatTheatre">
-        <settingConfig type="boolean"/>
-    </setting>
-    <setting propertyKey="@Properties.catWorship" title="@Strings.CatWorship">
         <settingConfig type="boolean"/>
     </setting>
     <setting propertyKey="@Properties.catRestaurant" title="@Strings.CatRestaurant">
