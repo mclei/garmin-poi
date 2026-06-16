@@ -4,18 +4,19 @@ import Toybox.Lang;
 // must match the parallel arrays in module PoiCat and the defaults in PoiModel.
 // Grouped logically: sights first, then food & drink. This order also drives
 // the filter menu and the phone settings list (both iterate 0..NUM_CATS).
-const CAT_VIEWPOINT  = 0;  // viewpoints, generic tourist attractions
-const CAT_MONUMENT   = 1;  // historic catch-all: monuments, memorials, other historic
-const CAT_CASTLE     = 2;  // castles, forts, city gates, palaces
-const CAT_RUINS      = 3;  // ruins, archaeological sites
-const CAT_WORSHIP    = 4;  // places of worship
-const CAT_MUSEUM     = 5;  // museum, gallery, artwork
-const CAT_THEATRE    = 6;  // theatre, cinema, arts centre
-const CAT_RESTAURANT = 7;
-const CAT_CAFE       = 8;  // cafe, fast food, ice cream
-const CAT_BAR        = 9;  // bar, pub, biergarten
-const NUM_CATS = 10;
-const NUM_LAND_CATS = 10;
+const CAT_VIEWPOINT  = 0;  // viewpoints, attractions, man-made landmarks (tower/lighthouse/windmill/obelisk)
+const CAT_NATURE     = 1;  // parks, gardens, nature reserves; peaks, waterfalls, caves, springs
+const CAT_MONUMENT   = 2;  // historic catch-all: monuments, memorials, other historic
+const CAT_CASTLE     = 3;  // castles, forts, city gates, palaces
+const CAT_RUINS      = 4;  // ruins, archaeological sites
+const CAT_WORSHIP    = 5;  // places of worship
+const CAT_MUSEUM     = 6;  // museum, gallery, artwork
+const CAT_THEATRE    = 7;  // theatre, cinema, arts centre
+const CAT_RESTAURANT = 8;
+const CAT_CAFE       = 9;  // cafe, fast food, ice cream
+const CAT_BAR        = 10; // bar, pub, biergarten
+const NUM_CATS = 11;
+const NUM_LAND_CATS = 11;
 
 // Fetch status
 const STATUS_IDLE = 0;
@@ -58,6 +59,7 @@ module PoiCat {
     // radar dot / arrow colors (24-bit RGB)
     const COLORS = [
         0x33AAFF, // viewpoint - sky blue
+        0x2E8B57, // nature    - forest green
         0xFFCC00, // monument  - gold
         0xFF8800, // castle    - orange
         0xBB6600, // ruins     - brown
@@ -70,12 +72,12 @@ module PoiCat {
     ] as Array<Number>;
 
     const SHORT = [
-        "view", "mon", "cstl", "ruin", "wrsp", "mus",
-        "thtr", "rest", "cafe", "bar"
+        "view", "park", "mon", "cstl", "ruin", "wrsp",
+        "mus", "thtr", "rest", "cafe", "bar"
     ] as Array<String>;
 
     const KEYS = [
-        "catViewpoint", "catMonument", "catCastle", "catRuins",
+        "catViewpoint", "catNature", "catMonument", "catCastle", "catRuins",
         "catWorship", "catMuseum", "catTheatre",
         "catRestaurant", "catCafe", "catBar"
     ] as Array<String>;
@@ -83,7 +85,7 @@ module PoiCat {
     // default on/off state when no stored property exists
     const DEFAULTS = [
         true, true, true, true, true, true,
-        false, true, false, false
+        true, false, true, false, false
     ] as Array<Boolean>;
 
     function color(cat as Number) as Number { return COLORS[cat]; }
@@ -94,11 +96,12 @@ module PoiCat {
     // String resource id for the category's display label.
     function label(cat as Number) as Symbol {
         var ids = [
-            Rez.Strings.CatViewpoint, Rez.Strings.CatMonument,
-            Rez.Strings.CatCastle, Rez.Strings.CatRuins,
-            Rez.Strings.CatWorship, Rez.Strings.CatMuseum,
-            Rez.Strings.CatTheatre, Rez.Strings.CatRestaurant,
-            Rez.Strings.CatCafe, Rez.Strings.CatBar
+            Rez.Strings.CatViewpoint, Rez.Strings.CatNature,
+            Rez.Strings.CatMonument, Rez.Strings.CatCastle,
+            Rez.Strings.CatRuins, Rez.Strings.CatWorship,
+            Rez.Strings.CatMuseum, Rez.Strings.CatTheatre,
+            Rez.Strings.CatRestaurant, Rez.Strings.CatCafe,
+            Rez.Strings.CatBar
         ];
         return ids[cat];
     }

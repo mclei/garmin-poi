@@ -283,7 +283,15 @@ class AheadGlance extends WatchUi.GlanceView {
         if (catOn(CAT_VIEWPOINT)) {
             url += tag("tourism:attraction") + tag("tourism:viewpoint")
                  + tag("tourism:zoo") + tag("tourism:theme_park")
-                 + tag("tourism:aquarium");
+                 + tag("tourism:aquarium")
+                 + tag("man_made:tower") + tag("man_made:lighthouse")
+                 + tag("man_made:windmill") + tag("man_made:obelisk");
+        }
+        if (catOn(CAT_NATURE)) {
+            url += tag("leisure:park") + tag("leisure:garden")
+                 + tag("leisure:nature_reserve")
+                 + tag("natural:peak") + tag("natural:waterfall")
+                 + tag("natural:cave_entrance") + tag("natural:spring");
         }
         if (catOn(CAT_RESTAURANT)) {
             url += tag("amenity:restaurant");

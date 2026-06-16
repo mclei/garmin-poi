@@ -3,6 +3,7 @@
     <property id="maxPois" type="number">40</property>
 
     <property id="catViewpoint" type="boolean">true</property>
+    <property id="catNature" type="boolean">true</property>
     <property id="catMonument" type="boolean">true</property>
     <property id="catCastle" type="boolean">true</property>
     <property id="catRuins" type="boolean">true</property>

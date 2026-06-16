@@ -7,6 +7,9 @@
     <setting propertyKey="@Properties.catViewpoint" title="@Strings.CatViewpoint">
         <settingConfig type="boolean"/>
     </setting>
+    <setting propertyKey="@Properties.catNature" title="@Strings.CatNature">
+        <settingConfig type="boolean"/>
+    </setting>
     <setting propertyKey="@Properties.catMonument" title="@Strings.CatMonument">
         <settingConfig type="boolean"/>
     </setting>

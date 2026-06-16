@@ -24,7 +24,10 @@ SDK Manager.
   the watch (hold for menu → Filters) and in the phone settings. Connect IQ
   has no multi-select list widget, so "pick the categories you want" is done
   with one toggle per category, grouped sights-first then food & drink:
-  - Viewpoints & attractions — `tourism=viewpoint/attraction`
+  - Viewpoints & attractions — `tourism=viewpoint/attraction/zoo/theme_park/aquarium`,
+    plus man-made landmarks `man_made=tower/lighthouse/windmill/obelisk`
+  - Parks & nature — `leisure=park/garden/nature_reserve` and
+    `natural=peak/waterfall/cave_entrance/spring`
   - Monuments & memorials — `historic=*` (the catch-all for historic features)
   - Castles & forts — `historic=castle/fort/city_gate/palace/…`
   - Ruins & archaeology — `historic=ruins/archaeological_site`
@@ -35,8 +38,8 @@ SDK Manager.
   - Cafés & fast food — `amenity=cafe/fast_food/ice_cream`
   - Bars & pubs — `amenity=bar/pub/biergarten`
 
-  Defaults on: Viewpoints, Monuments, Castles, Ruins, Places of worship,
-  Museums, Restaurants.
+  Defaults on: Viewpoints, Parks & nature, Monuments, Castles, Ruins, Places
+  of worship, Museums, Restaurants.
 - **Field of view** — POIs are shown only when they're roughly in front
   of you (within ~45° of your heading, ~90° total). As you turn, the set
   re-filters live from the already-loaded data (no refetch), with hysteresis so

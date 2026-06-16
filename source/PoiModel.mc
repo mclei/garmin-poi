@@ -470,7 +470,15 @@ class PoiModel {
         if (effectiveCatEnabled(CAT_VIEWPOINT)) {
             url += tag("tourism:attraction") + tag("tourism:viewpoint")
                  + tag("tourism:zoo") + tag("tourism:theme_park")
-                 + tag("tourism:aquarium");
+                 + tag("tourism:aquarium")
+                 + tag("man_made:tower") + tag("man_made:lighthouse")
+                 + tag("man_made:windmill") + tag("man_made:obelisk");
+        }
+        if (effectiveCatEnabled(CAT_NATURE)) {
+            url += tag("leisure:park") + tag("leisure:garden")
+                 + tag("leisure:nature_reserve")
+                 + tag("natural:peak") + tag("natural:waterfall")
+                 + tag("natural:cave_entrance") + tag("natural:spring");
         }
         if (effectiveCatEnabled(CAT_RESTAURANT)) {
             url += tag("amenity:restaurant");
@@ -617,6 +625,24 @@ class PoiModel {
             if (value.equals("museum") || value.equals("gallery")
                 || value.equals("artwork")) {
                 return [CAT_MUSEUM, value];
+            }
+        }
+        if (key.equals("man_made")) {
+            if (value.equals("tower") || value.equals("lighthouse")
+                || value.equals("windmill") || value.equals("obelisk")) {
+                return [CAT_VIEWPOINT, value];
+            }
+        }
+        if (key.equals("leisure")) {
+            if (value.equals("park") || value.equals("garden")
+                || value.equals("nature_reserve")) {
+                return [CAT_NATURE, value];
+            }
+        }
+        if (key.equals("natural")) {
+            if (value.equals("peak") || value.equals("waterfall")
+                || value.equals("cave_entrance") || value.equals("spring")) {
+                return [CAT_NATURE, value];
             }
         }
         if (key.equals("amenity")) {
