@@ -281,7 +281,9 @@ class AheadGlance extends WatchUi.GlanceView {
             }
         }
         if (catOn(CAT_VIEWPOINT)) {
-            url += tag("tourism:attraction") + tag("tourism:viewpoint");
+            url += tag("tourism:attraction") + tag("tourism:viewpoint")
+                 + tag("tourism:zoo") + tag("tourism:theme_park")
+                 + tag("tourism:aquarium");
         }
         if (catOn(CAT_RESTAURANT)) {
             url += tag("amenity:restaurant");

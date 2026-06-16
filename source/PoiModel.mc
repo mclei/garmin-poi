@@ -468,7 +468,9 @@ class PoiModel {
             }
         }
         if (effectiveCatEnabled(CAT_VIEWPOINT)) {
-            url += tag("tourism:attraction") + tag("tourism:viewpoint");
+            url += tag("tourism:attraction") + tag("tourism:viewpoint")
+                 + tag("tourism:zoo") + tag("tourism:theme_park")
+                 + tag("tourism:aquarium");
         }
         if (effectiveCatEnabled(CAT_RESTAURANT)) {
             url += tag("amenity:restaurant");
@@ -607,7 +609,9 @@ class PoiModel {
             return [CAT_MONUMENT, value]; // monuments, memorials, other historic
         }
         if (key.equals("tourism")) {
-            if (value.equals("attraction") || value.equals("viewpoint")) {
+            if (value.equals("attraction") || value.equals("viewpoint")
+                || value.equals("zoo") || value.equals("theme_park")
+                || value.equals("aquarium")) {
                 return [CAT_VIEWPOINT, value];
             }
             if (value.equals("museum") || value.equals("gallery")
