@@ -78,7 +78,7 @@ also shown in‑app under Filters → "Map data".
 manifest.xml            app manifest (watchapp, venux1)
 monkey.jungle           build file
 resources/              strings, properties, settings UI, launcher icon
-scripts/make_icon.py    regenerates the launcher icon (stdlib-only Python)
+scripts/make_icon.py    regenerates the launcher icon (map pin + compass; Pillow)
 source/
   AheadApp.mc           app entry point
   PoiModel.mc           GPS, compass, Photon fetching, state
