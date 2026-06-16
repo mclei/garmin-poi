@@ -6,10 +6,10 @@
     <property id="catCastle" type="boolean">true</property>
     <property id="catRuins" type="boolean">true</property>
     <property id="catViewpoint" type="boolean">true</property>
-    <property id="catRestaurant" type="boolean">true</property>
-    <property id="catCafe" type="boolean">false</property>
-    <property id="catBar" type="boolean">false</property>
     <property id="catMuseum" type="boolean">true</property>
     <property id="catTheatre" type="boolean">false</property>
     <property id="catWorship" type="boolean">true</property>
+    <property id="catRestaurant" type="boolean">true</property>
+    <property id="catCafe" type="boolean">false</property>
+    <property id="catBar" type="boolean">false</property>
 </properties>

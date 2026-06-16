@@ -16,15 +16,6 @@
     <setting propertyKey="@Properties.catViewpoint" title="@Strings.CatViewpoint">
         <settingConfig type="boolean"/>
     </setting>
-    <setting propertyKey="@Properties.catRestaurant" title="@Strings.CatRestaurant">
-        <settingConfig type="boolean"/>
-    </setting>
-    <setting propertyKey="@Properties.catCafe" title="@Strings.CatCafe">
-        <settingConfig type="boolean"/>
-    </setting>
-    <setting propertyKey="@Properties.catBar" title="@Strings.CatBar">
-        <settingConfig type="boolean"/>
-    </setting>
     <setting propertyKey="@Properties.catMuseum" title="@Strings.CatMuseum">
         <settingConfig type="boolean"/>
     </setting>
@@ -32,6 +23,15 @@
         <settingConfig type="boolean"/>
     </setting>
     <setting propertyKey="@Properties.catWorship" title="@Strings.CatWorship">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catRestaurant" title="@Strings.CatRestaurant">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catCafe" title="@Strings.CatCafe">
+        <settingConfig type="boolean"/>
+    </setting>
+    <setting propertyKey="@Properties.catBar" title="@Strings.CatBar">
         <settingConfig type="boolean"/>
     </setting>
 </settings>
