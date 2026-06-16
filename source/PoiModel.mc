@@ -1,5 +1,4 @@
 import Toybox.Application;
-import Toybox.Attention;
 import Toybox.Communications;
 import Toybox.Lang;
 import Toybox.Math;
@@ -51,13 +50,6 @@ const POI_RANGE = 5000.0;
 const HEADING_DEADBAND = 2.0;  // degrees
 const HEADING_SMOOTH = 0.5;    // 0..1 fraction moved toward a new reading
 
-// Keep-display-awake heuristic: hold the screen on while the watch is roughly
-// face-up AND being moved a little (i.e. held/looked at, not flat-still on a
-// desk). KEEPAWAKE_MOVE is the milliG L1 change counted as movement;
-// KEEPAWAKE_HOLD is how many seconds to keep awake after the last movement.
-const KEEPAWAKE_MOVE = 40;
-const KEEPAWAKE_HOLD = 3;
-
 // Central application state: position, heading, POI data and fetch logic.
 class PoiModel {
 
@@ -68,13 +60,6 @@ class PoiModel {
     public var posApprox as Boolean;  // true until a usable-quality fix arrives
     public var headingDeg as Float;
     private var _haveHeading as Boolean;
-    // keep-awake: last accel sample + when motion/backlight were last seen
-    private var _ax as Number;
-    private var _ay as Number;
-    private var _az as Number;
-    private var _haveAccel as Boolean;
-    private var _lastMoveSec as Number;
-    private var _lastLightSec as Number;
 
     // Data
     public var pois as Array<Poi>;       // land POIs, distance-sorted
@@ -108,12 +93,6 @@ class PoiModel {
         posApprox = false;
         headingDeg = 0.0;
         _haveHeading = false;
-        _ax = 0;
-        _ay = 0;
-        _az = 0;
-        _haveAccel = false;
-        _lastMoveSec = 0;
-        _lastLightSec = 0;
         pois = [] as Array<Poi>;
         visible = [] as Array<Poi>;
         targetPoi = null;
@@ -287,49 +266,11 @@ class PoiModel {
                 }
             }
         }
-        updateKeepAwake(si, now);
         if (lat == null) { return; }
         maybeFetchPois(now);
         // Rebuilt every tick so the field-of-view filter tracks the heading as
         // you turn (re-filters the already-loaded POIs, no refetch).
         rebuildVisible();
-    }
-
-    // Hold the display on while the watch is roughly face-up and being moved a
-    // little (held/looked at), so it doesn't sleep mid-use; when it's level but
-    // perfectly still (lying on a desk) it's allowed to sleep normally.
-    private function updateKeepAwake(si as Sensor.Info?, now as Number) as Void {
-        if (si == null) { return; }
-        var a = si.accel;
-        if (!(a instanceof Array) || a.size() < 3) { return; }
-        var x = a[0];
-        var y = a[1];
-        var z = a[2];
-        if (_haveAccel) {
-            var dx = x - _ax; if (dx < 0) { dx = -dx; }
-            var dy = y - _ay; if (dy < 0) { dy = -dy; }
-            var dz = z - _az; if (dz < 0) { dz = -dz; }
-            if (dx + dy + dz > KEEPAWAKE_MOVE) { _lastMoveSec = now; }
-        }
-        _ax = x; _ay = y; _az = z; _haveAccel = true;
-
-        // "Level/face-up": the up axis dominates, i.e. within ~60 deg of flat
-        // (4*z^2 > x^2+y^2+z^2  <=>  z/|a| > 0.5), and z positive (face up).
-        var magSq = x * x + y * y + z * z;
-        var level = (z > 0) && (z * z * 4 > magSq);
-        var active = level && ((now - _lastMoveSec) <= KEEPAWAKE_HOLD);
-
-        // Re-arm the backlight ~once a second while active. Guard + try/catch:
-        // on AMOLED, burn-in protection throws if held on too long - ignore it.
-        if (active && (now - _lastLightSec) >= 1) {
-            _lastLightSec = now;
-            if (Attention has :backlight) {
-                try {
-                    Attention.backlight(true);
-                } catch (e) {
-                }
-            }
-        }
     }
 
     // ---- visible set / focus ----
