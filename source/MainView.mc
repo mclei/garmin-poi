@@ -48,19 +48,7 @@ class MainView extends WatchUi.View {
         drawCompassRing(dc, cx, cy, ring);
 
         if (_model.lat == null) {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - 40, Graphics.FONT_SMALL,
-                        WatchUi.loadResource(Rez.Strings.WaitGps),
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - 16, Graphics.FONT_XTINY,
-                        "now: " + _model.gpsQualityLabel(),
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(cx, cy + 2, Graphics.FONT_XTINY, "need usable+",
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            if (_model.lastKnownAvailable()) {
-                drawLastKnownButton(dc, cx, cy + 34);
-            }
+            drawAcquiring(dc, cx, cy, ring);
             drawStatus(dc, cx, cy, ring, w, h);
             return;
         }
@@ -188,12 +176,51 @@ class MainView extends WatchUi.View {
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
+    // "Acquiring GPS" screen: title, live precision, threshold and the optional
+    // "Use last known" button, stacked and vertically centred with even gaps so
+    // nothing overlaps regardless of the device's font sizes.
+    private function drawAcquiring(dc as Dc, cx as Number, cy as Number,
+                                   ring as Number) as Void {
+        var fTitle = Graphics.FONT_MEDIUM;
+        var fInfo = Graphics.FONT_SMALL;
+        var gap = 12;
+        var hTitle = dc.getFontHeight(fTitle);
+        var hInfo = dc.getFontHeight(fInfo);
+        var hasBtn = _model.lastKnownAvailable();
+        var hBtn = hInfo + 10;
+        var maxW = (ring * 1.7).toNumber();
+
+        var total = hTitle + gap + hInfo + gap + hInfo;
+        if (hasBtn) { total += gap + hBtn; }
+        var y = cy - total / 2;
+
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, y + hTitle / 2, fTitle,
+                    fitText(dc, WatchUi.loadResource(Rez.Strings.WaitGps) as String,
+                            fTitle, maxW),
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        y += hTitle + gap;
+
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, y + hInfo / 2, fInfo, "now: " + _model.gpsQualityLabel(),
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        y += hInfo + gap;
+
+        dc.drawText(cx, y + hInfo / 2, fInfo, "need usable+",
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        y += hInfo + gap;
+
+        if (hasBtn) {
+            drawLastKnownButton(dc, cx, y + hBtn / 2);
+        }
+    }
+
     // Tappable button on the acquiring screen: adopt the cached last-known fix.
     private function drawLastKnownButton(dc as Dc, cx as Number, cy as Number) as Void {
         var label = WatchUi.loadResource(Rez.Strings.UseLastKnown) as String;
-        var font = Graphics.FONT_XTINY;
-        var bw = dc.getTextWidthInPixels(label, font) + 18;
-        var bh = dc.getFontHeight(font) + 8;
+        var font = Graphics.FONT_SMALL;
+        var bw = dc.getTextWidthInPixels(label, font) + 20;
+        var bh = dc.getFontHeight(font) + 10;
         dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
         dc.drawRoundedRectangle(cx - bw / 2, cy - bh / 2, bw, bh, 6);
         dc.drawText(cx, cy, font, label,
