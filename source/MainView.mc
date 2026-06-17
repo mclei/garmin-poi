@@ -192,13 +192,13 @@ class MainView extends WatchUi.View {
     // nothing overlaps regardless of the device's font sizes.
     private function drawAcquiring(dc as Dc, cx as Number, cy as Number,
                                    ring as Number) as Void {
-        var fTitle = Graphics.FONT_MEDIUM;
-        var fInfo = Graphics.FONT_SMALL;
-        var gap = 12;
+        var fTitle = Graphics.FONT_SMALL;
+        var fInfo = Graphics.FONT_TINY;
+        var gap = 9;
         var hTitle = dc.getFontHeight(fTitle);
         var hInfo = dc.getFontHeight(fInfo);
         var hasBtn = _model.lastKnownAvailable();
-        var hBtn = hInfo + 10;
+        var hBtn = hInfo + 8;
         var maxW = (ring * 1.7).toNumber();
 
         var total = hTitle + gap + hInfo + gap + hInfo;
@@ -230,9 +230,9 @@ class MainView extends WatchUi.View {
     // Records its bounds in _btn* so the delegate can hit-test touches.
     private function drawLastKnownButton(dc as Dc, cx as Number, cy as Number) as Void {
         var label = WatchUi.loadResource(Rez.Strings.UseLastKnown) as String;
-        var font = Graphics.FONT_SMALL;
-        var bw = dc.getTextWidthInPixels(label, font) + 20;
-        var bh = dc.getFontHeight(font) + 10;
+        var font = Graphics.FONT_TINY;
+        var bw = dc.getTextWidthInPixels(label, font) + 16;
+        var bh = dc.getFontHeight(font) + 8;
         _btnX = cx - bw / 2;
         _btnY = cy - bh / 2;
         _btnW = bw;
