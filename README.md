@@ -166,7 +166,9 @@ The launcher icon can be regenerated with `python3 scripts/make_icon.py`.
 Via Garmin Connect Mobile (or Connect IQ Store app) → Ahead →
 Settings: max places and the category toggles. (POIs auto-expand 200 m→5 km
 and need no radius setting.) Category toggles changed on the watch are
-persisted and synced back.
+persisted and synced back. **Show compass debug** prints the live magnetometer
+readout (`m <min>-<max> r<swing> s<spread>`) at the top of the main screen —
+a beta diagnostic for tuning the calibration check; turn it off for normal use.
 
 ## CI (GitHub Actions)
 
@@ -200,7 +202,7 @@ and push — the workflow runs automatically.
 | Status shows `retrying...` | A Photon request failed transiently (e.g. brief rate-limiting, surfacing as `-400`). The app just retries and it clears within a second or two. |
 | Status shows `no phone` | Watch not connected to the phone / no internet (`-104`) — this one needs you to act. |
 | `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
-| Arrow points the wrong way / compass frozen | Open Filters → **Calibrate compass** and wave the watch in a figure-8 until "N" points north. (The OS auto-calibrates from the motion; Connect IQ can't trigger calibration directly. If it stays wrong, recalibrate in the watch's system Sensors settings.) |
+| Arrow points the wrong way / compass frozen | Open Filters → **Calibrate compass** and wave the watch in a figure-8 until "N" points north. (The OS auto-calibrates from the motion; Connect IQ can't trigger calibration directly. If it stays wrong, recalibrate in the watch's system Sensors settings.) The app also samples the magnetometer (gated by accelerometer motion) and shows **"Compass may need calibration"** when the field magnitude swings too much as you turn — a soft hint, since nearby metal/magnets distort the field too. |
 
 ## Adding more devices
 

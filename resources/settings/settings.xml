@@ -4,6 +4,10 @@
         <settingConfig type="numeric" min="10" max="100"/>
     </setting>
 
+    <setting propertyKey="@Properties.debugCompass" title="@Strings.SetDebugCompass">
+        <settingConfig type="boolean"/>
+    </setting>
+
     <setting propertyKey="@Properties.catViewpoint" title="@Strings.CatViewpoint">
         <settingConfig type="boolean"/>
     </setting>

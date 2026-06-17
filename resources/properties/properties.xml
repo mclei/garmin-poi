@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <properties>
     <property id="maxPois" type="number">40</property>
+    <property id="debugCompass" type="boolean">true</property>
 
     <property id="catViewpoint" type="boolean">true</property>
     <property id="catNature" type="boolean">true</property>

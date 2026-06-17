@@ -50,6 +50,20 @@ const POI_RANGE = 5000.0;
 const HEADING_DEADBAND = 2.0;  // degrees
 const HEADING_SMOOTH = 0.5;    // 0..1 fraction moved toward a new reading
 
+// Compass-calibration heuristic: a well-calibrated magnetometer reads a roughly
+// constant field magnitude (~250-650 mG) in every orientation; hard/soft-iron
+// error makes |mag| swing as the watch turns. We sample |mag| over a window but
+// only trust the verdict once the accelerometer shows the watch was rotated
+// through enough orientations (ORIENT_SPREAD_MIN, the summed range of the
+// gravity unit-vector axes). MAG_VAR_THRESH is the (max-min)/mean swing above
+// which calibration is judged suspect; MAG_LO/HI bound a plausible Earth-field
+// magnitude in milliGauss (wide, since it varies by location).
+const MAG_WINDOW = 50;            // samples per assessment (~10 s at 5 Hz)
+const ORIENT_SPREAD_MIN = 0.6;
+const MAG_VAR_THRESH = 0.40;
+const MAG_LO = 200.0;
+const MAG_HI = 800.0;
+
 // Central application state: position, heading, POI data and fetch logic.
 class PoiModel {
 
@@ -60,6 +74,21 @@ class PoiModel {
     public var posApprox as Boolean;  // true until a usable-quality fix arrives
     public var headingDeg as Float;
     private var _haveHeading as Boolean;
+
+    // Compass-calibration detection + debug readout.
+    public var calSuspect as Boolean;     // true -> recommend recalibration
+    public var magAvailable as Boolean;   // has the magnetometer ever returned data
+    public var debugCompass as Boolean;   // show the on-screen debug readout
+    public var dbgMin as Float;           // last window's |mag| min / max / swing / spread
+    public var dbgMax as Float;
+    public var dbgRatio as Float;
+    public var dbgSpread as Float;
+    private var _magMin as Float;
+    private var _magMax as Float;
+    private var _magSum as Float;
+    private var _magCount as Number;
+    private var _gMin as Array<Float>;    // gravity unit-vector axis min/max in window
+    private var _gMax as Array<Float>;
 
     // Data
     public var pois as Array<Poi>;       // land POIs, distance-sorted
@@ -93,6 +122,19 @@ class PoiModel {
         posApprox = false;
         headingDeg = 0.0;
         _haveHeading = false;
+        calSuspect = false;
+        magAvailable = false;
+        debugCompass = true;
+        dbgMin = 0.0;
+        dbgMax = 0.0;
+        dbgRatio = 0.0;
+        dbgSpread = 0.0;
+        _magMin = 0.0;
+        _magMax = 0.0;
+        _magSum = 0.0;
+        _magCount = 0;
+        _gMin = [0.0, 0.0, 0.0];
+        _gMax = [0.0, 0.0, 0.0];
         pois = [] as Array<Poi>;
         visible = [] as Array<Poi>;
         targetPoi = null;
@@ -146,6 +188,7 @@ class PoiModel {
         maxPois = getNumProp("maxPois", 40);
         if (maxPois < 10) { maxPois = 10; }
         if (maxPois > 100) { maxPois = 100; }
+        debugCompass = getBoolProp("debugCompass", true);
         var arr = new Array<Boolean>[NUM_CATS];
         for (var c = 0; c < NUM_CATS; c++) {
             arr[c] = getBoolProp(PoiCat.propKey(c), PoiCat.defaultEnabled(c));
@@ -266,11 +309,72 @@ class PoiModel {
                 }
             }
         }
+        updateCompassCal(si);
         if (lat == null) { return; }
         maybeFetchPois(now);
         // Rebuilt every tick so the field-of-view filter tracks the heading as
         // you turn (re-filters the already-loaded POIs, no refetch).
         rebuildVisible();
+    }
+
+    // Estimate whether the compass calibration is bad by combining the
+    // magnetometer and the accelerometer. |mag| should stay constant in every
+    // orientation when calibrated; we accumulate its min/max/mean over a window
+    // and only judge once the gravity vector (from accel) has swept through
+    // enough orientations - otherwise a held-still watch trivially looks fine.
+    private function updateCompassCal(si as Sensor.Info?) as Void {
+        if (si == null) { return; }
+        var a = si.accel;
+        var m = si.mag;
+        if (!(a instanceof Array) || a.size() < 3
+            || !(m instanceof Array) || m.size() < 3) {
+            return;   // magnetometer/accel not available this tick
+        }
+        magAvailable = true;
+        var mx = m[0].toFloat();
+        var my = m[1].toFloat();
+        var mz = m[2].toFloat();
+        var mag = Math.sqrt(mx * mx + my * my + mz * mz).toFloat();
+        var ax = a[0].toFloat();
+        var ay = a[1].toFloat();
+        var az = a[2].toFloat();
+        var an = Math.sqrt(ax * ax + ay * ay + az * az).toFloat();
+        if (an < 1.0) { return; }
+        var gx = ax / an;
+        var gy = ay / an;
+        var gz = az / an;
+
+        if (_magCount == 0) {
+            _magMin = mag; _magMax = mag;
+            _gMin = [gx, gy, gz];
+            _gMax = [gx, gy, gz];
+        } else {
+            if (mag < _magMin) { _magMin = mag; }
+            if (mag > _magMax) { _magMax = mag; }
+            if (gx < _gMin[0]) { _gMin[0] = gx; } if (gx > _gMax[0]) { _gMax[0] = gx; }
+            if (gy < _gMin[1]) { _gMin[1] = gy; } if (gy > _gMax[1]) { _gMax[1] = gy; }
+            if (gz < _gMin[2]) { _gMin[2] = gz; } if (gz > _gMax[2]) { _gMax[2] = gz; }
+        }
+        _magSum += mag;
+        _magCount++;
+
+        if (_magCount >= MAG_WINDOW) {
+            var spread = (_gMax[0] - _gMin[0]) + (_gMax[1] - _gMin[1])
+                       + (_gMax[2] - _gMin[2]);
+            var mean = _magSum / _magCount;
+            var ratio = (mean > 1.0) ? (_magMax - _magMin) / mean : 0.0;
+            dbgMin = _magMin;
+            dbgMax = _magMax;
+            dbgRatio = ratio;
+            dbgSpread = spread;
+            // Only update the verdict if the watch was actually rotated enough.
+            if (spread >= ORIENT_SPREAD_MIN) {
+                calSuspect = (mean < MAG_LO) || (mean > MAG_HI)
+                          || (ratio > MAG_VAR_THRESH);
+            }
+            _magCount = 0;
+            _magSum = 0.0;
+        }
     }
 
     // ---- visible set / focus ----

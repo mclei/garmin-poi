@@ -210,6 +210,32 @@ class MainView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, sy, Graphics.FONT_XTINY, s,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Compass-calibration recommendation, just above the status line.
+        if (_model.calSuspect) {
+            dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, sy - dc.getFontHeight(Graphics.FONT_XTINY),
+                        Graphics.FONT_XTINY,
+                        WatchUi.loadResource(Rez.Strings.CalNeeded),
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+
+        // Magnetometer debug readout at the top (|mag| min-max, swing ratio,
+        // orientation spread) so the thresholds can be checked on the device.
+        if (_model.debugCompass) {
+            var dbg;
+            if (!_model.magAvailable) {
+                dbg = "mag: n/a";
+            } else {
+                dbg = "m " + _model.dbgMin.format("%.0f") + "-"
+                    + _model.dbgMax.format("%.0f")
+                    + " r" + _model.dbgRatio.format("%.2f")
+                    + " s" + _model.dbgSpread.format("%.1f");
+            }
+            dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, 2, Graphics.FONT_XTINY, dbg,
+                        Graphics.TEXT_JUSTIFY_CENTER);
+        }
     }
 
     // Filled triangle pointing at angleDeg (0 = up, clockwise), centered on x,y

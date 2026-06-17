@@ -33,4 +33,6 @@
     <string id="CatWorship">Places of worship</string>
 
     <string id="SetMaxPois">Max places shown</string>
+    <string id="SetDebugCompass">Show compass debug</string>
+    <string id="CalNeeded">Compass may need calibration</string>
 </strings>
