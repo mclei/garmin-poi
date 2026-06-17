@@ -3,7 +3,7 @@
     <string id="AppName">Ahead</string>
     <string id="Subtitle">The place in front of you</string>
 
-    <string id="WaitGps">Waiting for GPS...</string>
+    <string id="WaitGps">Acquiring precise GPS</string>
     <string id="Loading">Loading places...</string>
     <string id="NoPois">Nothing found yet</string>
 

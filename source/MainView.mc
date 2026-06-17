@@ -53,7 +53,8 @@ class MainView extends WatchUi.View {
                         WatchUi.loadResource(Rez.Strings.WaitGps),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.drawText(cx, cy + 18, Graphics.FONT_XTINY,
-                        WatchUi.loadResource(Rez.Strings.Subtitle),
+                        "precision: " + _model.gpsQualityLabel()
+                            + " (need good)",
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             drawStatus(dc, cx, cy, ring, w, h);
             return;
@@ -185,11 +186,10 @@ class MainView extends WatchUi.View {
     private function drawStatus(dc as Dc, cx as Number, cy as Number,
                                 ring as Number, w as Number, h as Number) as Void {
         var hdg = _model.headingDeg;
-        var approx = (_model.posApprox && _model.lat != null) ? "~" : "";
         var s = "";
         var os = _model.oneShotCategory();
         if (os >= 0) { s += "only " + PoiCat.shortName(os) + " | "; }
-        s += approx + hdg.toNumber().toString() + " "
+        s += hdg.toNumber().toString() + " "
            + GeoUtils.cardinal(hdg) + " | ";
         if (_model.lat == null) {
             s += "no fix";

@@ -70,8 +70,7 @@ class PoiModel {
     // Position / heading
     public var lat as Double?;
     public var lon as Double?;
-    public var gpsQuality as Number;
-    public var posApprox as Boolean;  // true until a usable-quality fix arrives
+    public var gpsQuality as Number;  // latest Position.QUALITY_* (for display)
     public var headingDeg as Float;
     private var _haveHeading as Boolean;
 
@@ -119,7 +118,6 @@ class PoiModel {
         lat = null;
         lon = null;
         gpsQuality = 0;
-        posApprox = false;
         headingDeg = 0.0;
         _haveHeading = false;
         calSuspect = false;
@@ -162,19 +160,9 @@ class PoiModel {
     function start() as Void {
         Position.enableLocationEvents(Position.LOCATION_CONTINUOUS,
                                       method(:onPosition));
-        // Seed with the cached last-known location so POIs can load while the
-        // GPS is still acquiring a precise fix. Marked approximate until a
-        // usable-quality fix arrives (handled in onPosition).
-        var info = Position.getInfo();
-        if (info != null && info.position != null) {
-            var deg = info.position.toDegrees();
-            lat = deg[0].toDouble();
-            lon = deg[1].toDouble();
-            var q = (info.accuracy != null) ? info.accuracy as Number : 0;
-            gpsQuality = q;
-            posApprox = (q < Position.QUALITY_USABLE);
-            updateDerived();
-        }
+        // Deliberately NO cached/last-known seed: we wait for a genuinely precise
+        // fix (QUALITY_GOOD) before showing anything, so POIs are never placed
+        // around a stale or coarse position. onPosition accepts the first one.
     }
 
     function stop() as Void {
@@ -276,21 +264,21 @@ class PoiModel {
     // ---- position & heading ----
 
     function onPosition(info as Position.Info) as Void {
-        if (info.position != null) {
-            var deg = info.position.toDegrees();
-            lat = deg[0].toDouble();
-            lon = deg[1].toDouble();
-            var q = (info.accuracy != null) ? info.accuracy as Number : gpsQuality;
-            gpsQuality = q;
-            // First usable-quality fix: drop the approximate flag and refine the
-            // POI list at the precise location even if we moved less than 400 m.
-            if (posApprox && q >= Position.QUALITY_USABLE) {
-                posApprox = false;
-                _needPoiFetch = true;
-                _lastPoiAttemptSec = 0;
-            }
-            updateDerived();
+        var q = (info.accuracy != null) ? info.accuracy as Number
+                                        : Position.QUALITY_NOT_AVAILABLE;
+        gpsQuality = q;                 // tracked so the "acquiring" screen shows it
+        // Accept only a precise fix. Connect IQ reports accuracy as a quality
+        // tier (good/usable/poor/...), NOT metres, so QUALITY_GOOD is the closest
+        // proxy for "precise". Coarser fixes are ignored; the last accepted
+        // position is kept. The first accepted fix triggers the initial search
+        // via maybeFetchPois (its _fetchLat == null branch).
+        if (info.position == null || q < Position.QUALITY_GOOD) {
+            return;
         }
+        var deg = info.position.toDegrees();
+        lat = deg[0].toDouble();
+        lon = deg[1].toDouble();
+        updateDerived();
     }
 
     // Called ~5x/s from the main view timer
@@ -506,14 +494,23 @@ class PoiModel {
         }
     }
 
-    // Tightest sensible starting radius for the expanding search, based on how
-    // precise the current fix is: a 50 m search only makes sense when the
-    // position is accurate to a few metres; an approximate/last-known position
-    // starts wider so it isn't searching the wrong 50 m circle.
+    // Starting radius for the expanding search. We only accept precise (GOOD)
+    // fixes, so a tight 50 m start is always justified; the ladder widens from
+    // there if too few POIs are found.
     private function startLadderIndex() as Number {
-        if (!posApprox && gpsQuality >= Position.QUALITY_GOOD)   { return 0; } // 50 m
-        if (!posApprox && gpsQuality >= Position.QUALITY_USABLE) { return 2; } // 200 m
-        return 3; // approximate or poor -> 500 m
+        // Only precise (GOOD) fixes are accepted, so always start tight at 50 m.
+        return 0;
+    }
+
+    // Human-readable current GPS precision, shown on the "acquiring" screen
+    // while waiting for a precise fix.
+    function gpsQualityLabel() as String {
+        var q = gpsQuality;
+        if (q >= Position.QUALITY_GOOD)       { return "good"; }
+        if (q >= Position.QUALITY_USABLE)     { return "usable"; }
+        if (q >= Position.QUALITY_POOR)       { return "poor"; }
+        if (q == Position.QUALITY_LAST_KNOWN) { return "last known"; }
+        return "no signal";
     }
 
     private function fetchPois() as Void {

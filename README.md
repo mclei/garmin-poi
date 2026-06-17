@@ -46,14 +46,18 @@ SDK Manager.
   POIs near the edge don't flicker.
 - **Range** — an *expanding search* that widens until it has found enough POIs
   (about 10), or reaches 5 km. A tight radius with only a hit or two keeps
-  widening so you get a useful set, not just the single closest thing. The starting radius tracks GPS precision: **50 m** on a good
-  fix, ~200 m on a usable one, ~500 m while the position is still approximate —
-  so a precise fix in a city shows exactly what's right in front of you. POIs
-  come from Photon's `/reverse` endpoint with `osm_tag` category filters, which
+  widening so you get a useful set, not just the single closest thing. It always
+  starts tight at **50 m** (only precise fixes are used — see *Precise fix
+  only*), so in a city it shows exactly what's right in front of you. POIs come
+  from Photon's `/reverse` endpoint with `osm_tag` category filters, which
   returns a compact, distance-sorted result small enough to parse on-watch.
-- **Fast start** — on launch the app seeds from the cached last-known position
-  so POIs load immediately while the GPS warms up. The status line shows a
-  leading `~` until a precise fix arrives, then the list is refined to it.
+- **Precise fix only** — the app does **not** use the cached last-known
+  position. It waits for a genuinely precise fix (Connect IQ quality `GOOD` —
+  the API exposes a quality tier, not a metre value, so this is the closest
+  proxy for "accurate to a few tens of metres") before showing anything, and
+  ignores coarser updates. Until then it shows *"Acquiring precise GPS"* with
+  the current precision (no signal → poor → usable → good), so you know why it's
+  waiting.
 - **Glance** — in the watch's glance carousel, Ahead shows the place in front
   of you ("Charles Bridge  120 m"). It fetches on demand *when it scrolls into
   view*: reads the last-known position and runs one small POI query (1.5 km,
