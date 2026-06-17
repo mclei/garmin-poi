@@ -25,7 +25,8 @@ module PoiUi {
             WatchUi.loadResource(Rez.Strings.AboutData) as String,
             WatchUi.loadResource(Rez.Strings.AboutCredit) as String,
             "about", null));
-        WatchUi.pushView(menu, new FilterMenuDelegate(model), WatchUi.SLIDE_UP);
+        // Opened by the right-edge swipe -> slide in from the right.
+        WatchUi.pushView(menu, new FilterMenuDelegate(model), WatchUi.SLIDE_LEFT);
     }
 
     function pushPoiList(model as PoiModel) as Void {
@@ -55,7 +56,8 @@ module PoiUi {
                     + " | " + PoiCat.shortName(p.category);
             menu.addItem(new WatchUi.MenuItem(p.name, sub, i, null));
         }
-        WatchUi.pushView(menu, new PoiListDelegate(model, vis), WatchUi.SLIDE_LEFT);
+        // Opened by the swipe-up gesture -> slide up from the bottom.
+        WatchUi.pushView(menu, new PoiListDelegate(model, vis), WatchUi.SLIDE_UP);
     }
 
     // Scrollable detail page for a single POI / aircraft.
@@ -79,7 +81,8 @@ module PoiUi {
                 WatchUi.loadResource(Rez.Strings.MenuMyFilters) as String,
                 null, -1, null));
         }
-        WatchUi.pushView(menu, new QuickMenuDelegate(model), WatchUi.SLIDE_UP);
+        // Opened by the swipe-down gesture -> slide down from the top.
+        WatchUi.pushView(menu, new QuickMenuDelegate(model), WatchUi.SLIDE_DOWN);
     }
 }
 
@@ -101,7 +104,8 @@ class QuickMenuDelegate extends WatchUi.Menu2InputDelegate {
                 _model.loadOnlyCategory(id);
             }
         }
-        WatchUi.popView(WatchUi.SLIDE_DOWN);
+        // Reverse of the slide-down it opened with.
+        WatchUi.popView(WatchUi.SLIDE_UP);
     }
 }
 
@@ -118,7 +122,8 @@ class FilterMenuDelegate extends WatchUi.Menu2InputDelegate {
         var id = item.getId();
         if (id instanceof String && id.equals("refresh")) {
             _model.forceRefresh();
-            WatchUi.popView(WatchUi.SLIDE_DOWN);
+            // Reverse of the slide-left it opened with.
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return;
         }
         if (id instanceof String && id.equals("calibrate")) {
@@ -147,9 +152,10 @@ class PoiListDelegate extends WatchUi.Menu2InputDelegate {
         var id = item.getId();
         if (id instanceof Number) {
             if (id == -2) {
-                // toggle the field-of-view filter and rebuild the list
+                // toggle the field-of-view filter and rebuild the list; pop
+                // immediately so only the re-pushed list animates (slides up)
                 _model.listShowAll = !_model.listShowAll;
-                WatchUi.popView(WatchUi.SLIDE_RIGHT);
+                WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
                 PoiUi.pushPoiList(_model);
             } else if (id >= 0 && id < _items.size()) {
                 PoiUi.pushDetail(_model, _items[id]); // list item -> detail page
