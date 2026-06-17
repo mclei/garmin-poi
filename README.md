@@ -57,6 +57,9 @@ SDK Manager.
   the closest proxy for "accurate enough") before showing anything, and ignores
   coarser updates. Until then it shows *"Acquiring GPS"* with the current
   precision (no signal → poor → usable → good), so you know why it's waiting.
+  If you don't want to wait, tap **"Use last known"** on that screen to start
+  from the cached position immediately (shown provisional with a `~`); the app
+  keeps acquiring and refreshes the list the moment a real fix arrives.
 - **Glance** — in the watch's glance carousel, Ahead shows the place in front
   of you ("Charles Bridge  120 m"). It fetches on demand *when it scrolls into
   view*: reads the last-known position and runs one small POI query (1.5 km,

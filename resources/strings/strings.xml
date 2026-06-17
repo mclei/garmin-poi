@@ -4,6 +4,7 @@
     <string id="Subtitle">The place in front of you</string>
 
     <string id="WaitGps">Acquiring GPS</string>
+    <string id="UseLastKnown">Use last known</string>
     <string id="Loading">Loading places...</string>
     <string id="NoPois">Nothing found yet</string>
 

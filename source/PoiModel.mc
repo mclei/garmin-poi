@@ -71,6 +71,7 @@ class PoiModel {
     public var lat as Double?;
     public var lon as Double?;
     public var gpsQuality as Number;  // latest Position.QUALITY_* (for display)
+    public var usingLastKnown as Boolean;  // running on the user-chosen cached fix
     public var headingDeg as Float;
     private var _haveHeading as Boolean;
 
@@ -118,6 +119,7 @@ class PoiModel {
         lat = null;
         lon = null;
         gpsQuality = 0;
+        usingLastKnown = false;
         headingDeg = 0.0;
         _haveHeading = false;
         calSuspect = false;
@@ -278,6 +280,34 @@ class PoiModel {
         var deg = info.position.toDegrees();
         lat = deg[0].toDouble();
         lon = deg[1].toDouble();
+        // If we'd been running on the user-chosen last-known position, this real
+        // fix supersedes it - refresh the list at the precise location.
+        if (usingLastKnown) {
+            usingLastKnown = false;
+            _needPoiFetch = true;
+            _lastPoiAttemptSec = 0;
+        }
+        updateDerived();
+    }
+
+    // Whether a cached last-known position exists to fall back on.
+    function lastKnownAvailable() as Boolean {
+        var info = Position.getInfo();
+        return (info != null && info.position != null);
+    }
+
+    // User chose to stop waiting and use the cached last-known position. We keep
+    // acquiring in the background; the first usable-or-better fix replaces it and
+    // refreshes the list (handled in onPosition). Marked provisional ("~").
+    function useLastKnown() as Void {
+        var info = Position.getInfo();
+        if (info == null || info.position == null) { return; }
+        var deg = info.position.toDegrees();
+        lat = deg[0].toDouble();
+        lon = deg[1].toDouble();
+        usingLastKnown = true;
+        _needPoiFetch = true;
+        _lastPoiAttemptSec = 0;
         updateDerived();
     }
 
@@ -495,9 +525,11 @@ class PoiModel {
     }
 
     // Starting radius for the expanding search: 50 m on a good fix, 200 m on a
-    // usable (less precise) one so it isn't hunting the wrong 50 m circle. The
-    // ladder widens from there if too few POIs are found.
+    // usable one (so it isn't hunting the wrong 50 m circle), 500 m on a
+    // user-chosen last-known fix (which can be quite stale). The ladder widens
+    // from there if too few POIs are found.
     private function startLadderIndex() as Number {
+        if (usingLastKnown) { return 3; }   // cached fix can be off -> start at 500 m
         return (gpsQuality >= Position.QUALITY_GOOD) ? 0 : 2;
     }
 

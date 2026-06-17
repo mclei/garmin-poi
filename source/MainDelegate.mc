@@ -20,10 +20,21 @@ class MainDelegate extends WatchUi.BehaviorDelegate {
     // Primary action button (Start/Enter) and screen tap both open the detail
     // page of the shown POI. Settings are reached by the right-edge swipe.
     function onSelect() as Boolean {
-        return openDetail();
+        return primaryAction();
     }
 
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        return primaryAction();
+    }
+
+    // On the acquiring screen the primary action adopts the last-known fix;
+    // once positioned, it opens the focused POI's detail page.
+    private function primaryAction() as Boolean {
+        if (_model.lat == null) {
+            _model.useLastKnown();
+            WatchUi.requestUpdate();
+            return true;
+        }
         return openDetail();
     }
 

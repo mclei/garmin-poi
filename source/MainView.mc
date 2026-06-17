@@ -49,15 +49,18 @@ class MainView extends WatchUi.View {
 
         if (_model.lat == null) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - 28, Graphics.FONT_SMALL,
+            dc.drawText(cx, cy - 40, Graphics.FONT_SMALL,
                         WatchUi.loadResource(Rez.Strings.WaitGps),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy + 2, Graphics.FONT_XTINY,
+            dc.drawText(cx, cy - 16, Graphics.FONT_XTINY,
                         "now: " + _model.gpsQualityLabel(),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(cx, cy + 24, Graphics.FONT_XTINY, "need usable+",
+            dc.drawText(cx, cy + 2, Graphics.FONT_XTINY, "need usable+",
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            if (_model.lastKnownAvailable()) {
+                drawLastKnownButton(dc, cx, cy + 34);
+            }
             drawStatus(dc, cx, cy, ring, w, h);
             return;
         }
@@ -185,13 +188,27 @@ class MainView extends WatchUi.View {
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
+    // Tappable button on the acquiring screen: adopt the cached last-known fix.
+    private function drawLastKnownButton(dc as Dc, cx as Number, cy as Number) as Void {
+        var label = WatchUi.loadResource(Rez.Strings.UseLastKnown) as String;
+        var font = Graphics.FONT_XTINY;
+        var bw = dc.getTextWidthInPixels(label, font) + 18;
+        var bh = dc.getFontHeight(font) + 8;
+        dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
+        dc.drawRoundedRectangle(cx - bw / 2, cy - bh / 2, bw, bh, 6);
+        dc.drawText(cx, cy, font, label,
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
     private function drawStatus(dc as Dc, cx as Number, cy as Number,
                                 ring as Number, w as Number, h as Number) as Void {
         var hdg = _model.headingDeg;
+        // "~" marks a provisional position (user-chosen last-known fix).
+        var approx = _model.usingLastKnown ? "~" : "";
         var s = "";
         var os = _model.oneShotCategory();
         if (os >= 0) { s += "only " + PoiCat.shortName(os) + " | "; }
-        s += hdg.toNumber().toString() + " "
+        s += approx + hdg.toNumber().toString() + " "
            + GeoUtils.cardinal(hdg) + " | ";
         if (_model.lat == null) {
             s += "no fix";
