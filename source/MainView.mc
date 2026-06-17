@@ -49,12 +49,14 @@ class MainView extends WatchUi.View {
 
         if (_model.lat == null) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - 12, Graphics.FONT_MEDIUM,
+            dc.drawText(cx, cy - 28, Graphics.FONT_SMALL,
                         WatchUi.loadResource(Rez.Strings.WaitGps),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.drawText(cx, cy + 18, Graphics.FONT_XTINY,
-                        "precision: " + _model.gpsQualityLabel()
-                            + " (need good)",
+            dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy + 2, Graphics.FONT_XTINY,
+                        "now: " + _model.gpsQualityLabel(),
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(cx, cy + 24, Graphics.FONT_XTINY, "need usable+",
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             drawStatus(dc, cx, cy, ring, w, h);
             return;

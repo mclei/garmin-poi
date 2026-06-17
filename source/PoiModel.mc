@@ -160,9 +160,9 @@ class PoiModel {
     function start() as Void {
         Position.enableLocationEvents(Position.LOCATION_CONTINUOUS,
                                       method(:onPosition));
-        // Deliberately NO cached/last-known seed: we wait for a genuinely precise
-        // fix (QUALITY_GOOD) before showing anything, so POIs are never placed
-        // around a stale or coarse position. onPosition accepts the first one.
+        // Deliberately NO cached/last-known seed: we wait for a usable-or-better
+        // fix before showing anything, so POIs are never placed around a stale
+        // or coarse position. onPosition accepts the first qualifying fix.
     }
 
     function stop() as Void {
@@ -267,12 +267,12 @@ class PoiModel {
         var q = (info.accuracy != null) ? info.accuracy as Number
                                         : Position.QUALITY_NOT_AVAILABLE;
         gpsQuality = q;                 // tracked so the "acquiring" screen shows it
-        // Accept only a precise fix. Connect IQ reports accuracy as a quality
-        // tier (good/usable/poor/...), NOT metres, so QUALITY_GOOD is the closest
-        // proxy for "precise". Coarser fixes are ignored; the last accepted
-        // position is kept. The first accepted fix triggers the initial search
-        // via maybeFetchPois (its _fetchLat == null branch).
-        if (info.position == null || q < Position.QUALITY_GOOD) {
+        // Accept a usable-or-better fix. Connect IQ reports accuracy as a quality
+        // tier (good/usable/poor/...), NOT metres, so QUALITY_USABLE is the
+        // lowest tier we treat as precise enough. Coarser fixes are ignored; the
+        // last accepted position is kept. The first accepted fix triggers the
+        // initial search via maybeFetchPois (its _fetchLat == null branch).
+        if (info.position == null || q < Position.QUALITY_USABLE) {
             return;
         }
         var deg = info.position.toDegrees();
@@ -494,12 +494,11 @@ class PoiModel {
         }
     }
 
-    // Starting radius for the expanding search. We only accept precise (GOOD)
-    // fixes, so a tight 50 m start is always justified; the ladder widens from
-    // there if too few POIs are found.
+    // Starting radius for the expanding search: 50 m on a good fix, 200 m on a
+    // usable (less precise) one so it isn't hunting the wrong 50 m circle. The
+    // ladder widens from there if too few POIs are found.
     private function startLadderIndex() as Number {
-        // Only precise (GOOD) fixes are accepted, so always start tight at 50 m.
-        return 0;
+        return (gpsQuality >= Position.QUALITY_GOOD) ? 0 : 2;
     }
 
     // Human-readable current GPS precision, shown on the "acquiring" screen

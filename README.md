@@ -46,18 +46,17 @@ SDK Manager.
   POIs near the edge don't flicker.
 - **Range** — an *expanding search* that widens until it has found enough POIs
   (about 10), or reaches 5 km. A tight radius with only a hit or two keeps
-  widening so you get a useful set, not just the single closest thing. It always
-  starts tight at **50 m** (only precise fixes are used — see *Precise fix
-  only*), so in a city it shows exactly what's right in front of you. POIs come
-  from Photon's `/reverse` endpoint with `osm_tag` category filters, which
-  returns a compact, distance-sorted result small enough to parse on-watch.
-- **Precise fix only** — the app does **not** use the cached last-known
-  position. It waits for a genuinely precise fix (Connect IQ quality `GOOD` —
-  the API exposes a quality tier, not a metre value, so this is the closest
-  proxy for "accurate to a few tens of metres") before showing anything, and
-  ignores coarser updates. Until then it shows *"Acquiring precise GPS"* with
-  the current precision (no signal → poor → usable → good), so you know why it's
-  waiting.
+  widening so you get a useful set, not just the single closest thing. It starts
+  at **50 m** on a good fix (**200 m** on a usable one), so in a city it shows
+  exactly what's right in front of you. POIs come from Photon's `/reverse`
+  endpoint with `osm_tag` category filters, which returns a compact,
+  distance-sorted result small enough to parse on-watch.
+- **Real fix only** — the app does **not** use the cached last-known position.
+  It waits for a fix of **usable or better** quality (Connect IQ exposes
+  accuracy as a quality tier — good/usable/poor — not a metre value, so this is
+  the closest proxy for "accurate enough") before showing anything, and ignores
+  coarser updates. Until then it shows *"Acquiring GPS"* with the current
+  precision (no signal → poor → usable → good), so you know why it's waiting.
 - **Glance** — in the watch's glance carousel, Ahead shows the place in front
   of you ("Charles Bridge  120 m"). It fetches on demand *when it scrolls into
   view*: reads the last-known position and runs one small POI query (1.5 km,
