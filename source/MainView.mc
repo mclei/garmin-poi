@@ -9,11 +9,21 @@ class MainView extends WatchUi.View {
 
     private var _model as PoiModel;
     private var _timer as Timer.Timer?;
+    // Bounds of the "Use last known" button as last drawn (_btnW == 0 = absent),
+    // so the delegate can hit-test touches against it.
+    private var _btnX as Number;
+    private var _btnY as Number;
+    private var _btnW as Number;
+    private var _btnH as Number;
 
     function initialize(model as PoiModel) {
         View.initialize();
         _model = model;
         _timer = null;
+        _btnX = 0;
+        _btnY = 0;
+        _btnW = 0;
+        _btnH = 0;
     }
 
     function onShow() as Void {
@@ -44,6 +54,7 @@ class MainView extends WatchUi.View {
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
+        _btnW = 0;   // cleared each frame; set only when the button is drawn
 
         drawCompassRing(dc, cx, cy, ring);
 
@@ -216,15 +227,29 @@ class MainView extends WatchUi.View {
     }
 
     // Tappable button on the acquiring screen: adopt the cached last-known fix.
+    // Records its bounds in _btn* so the delegate can hit-test touches.
     private function drawLastKnownButton(dc as Dc, cx as Number, cy as Number) as Void {
         var label = WatchUi.loadResource(Rez.Strings.UseLastKnown) as String;
         var font = Graphics.FONT_SMALL;
         var bw = dc.getTextWidthInPixels(label, font) + 20;
         var bh = dc.getFontHeight(font) + 10;
+        _btnX = cx - bw / 2;
+        _btnY = cy - bh / 2;
+        _btnW = bw;
+        _btnH = bh;
         dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(cx - bw / 2, cy - bh / 2, bw, bh, 6);
+        dc.drawRoundedRectangle(_btnX, _btnY, bw, bh, 6);
         dc.drawText(cx, cy, font, label,
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // True if (x, y) is on the "Use last known" button as last drawn, with a
+    // forgiving margin so near-misses still count. False when no button shown.
+    function lastKnownHit(x as Number, y as Number) as Boolean {
+        if (_btnW <= 0) { return false; }
+        var pad = 16;
+        return (x >= _btnX - pad) && (x <= _btnX + _btnW + pad)
+            && (y >= _btnY - pad) && (y <= _btnY + _btnH + pad);
     }
 
     private function drawStatus(dc as Dc, cx as Number, cy as Number,
