@@ -265,15 +265,29 @@ class PoiModel {
 
     // ---- position & heading ----
 
+    // Location-event callback (fires when not pre-empted by an activity).
     function onPosition(info as Position.Info) as Void {
+        applyFix(info);
+    }
+
+    // Also polled from tick() via Position.getInfo(): while an activity is
+    // recording it owns the GPS and the enableLocationEvents callback above may
+    // never fire, but getInfo() still returns the live shared fix - so polling
+    // is what lets us acquire a position during an activity.
+    function pollPosition() as Void {
+        applyFix(Position.getInfo());
+    }
+
+    // Apply a fix from either source. Accept only usable-or-better; Connect IQ
+    // reports accuracy as a quality tier (good/usable/poor/...), NOT metres, so
+    // QUALITY_USABLE is the lowest tier we treat as precise enough. Coarser /
+    // last-known fixes are ignored (the position is left unchanged). The first
+    // accepted fix triggers the initial search via maybeFetchPois.
+    private function applyFix(info as Position.Info?) as Void {
+        if (info == null) { return; }
         var q = (info.accuracy != null) ? info.accuracy as Number
                                         : Position.QUALITY_NOT_AVAILABLE;
         gpsQuality = q;                 // tracked so the "acquiring" screen shows it
-        // Accept a usable-or-better fix. Connect IQ reports accuracy as a quality
-        // tier (good/usable/poor/...), NOT metres, so QUALITY_USABLE is the
-        // lowest tier we treat as precise enough. Coarser fixes are ignored; the
-        // last accepted position is kept. The first accepted fix triggers the
-        // initial search via maybeFetchPois (its _fetchLat == null branch).
         if (info.position == null || q < Position.QUALITY_USABLE) {
             return;
         }
@@ -328,6 +342,9 @@ class PoiModel {
             }
         }
         updateCompassCal(si);
+        // Poll the shared GPS state too - the location-event callback can be
+        // silent while an activity is recording, but getInfo() still has the fix.
+        pollPosition();
         if (lat == null) { return; }
         maybeFetchPois(now);
         // Rebuilt every tick so the field-of-view filter tracks the heading as

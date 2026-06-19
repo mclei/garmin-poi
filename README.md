@@ -59,7 +59,10 @@ SDK Manager.
   precision (no signal → poor → usable → good), so you know why it's waiting.
   If you don't want to wait, tap **"Use last known"** on that screen to start
   from the cached position immediately (shown provisional with a `~`); the app
-  keeps acquiring and refreshes the list the moment a real fix arrives.
+  keeps acquiring and refreshes the list the moment a real fix arrives. The
+  position is read both from location events and by polling the shared GPS
+  state, so it still acquires while an **activity is recording** (whose GPS
+  would otherwise pre-empt the event callback).
 - **Glance** — in the watch's glance carousel, Ahead shows the place in front
   of you ("Charles Bridge  120 m"). It fetches on demand *when it scrolls into
   view*: reads the last-known position and runs one small POI query (1.5 km,
