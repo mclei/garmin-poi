@@ -20,6 +20,8 @@
     <string id="ListAll">All around (360°)</string>
     <string id="ListInView">In view only (90°)</string>
     <string id="ListTapSwitch">tap to switch</string>
+    <string id="AdvancedInfo">Advanced info on phone »</string>
+    <string id="AdvancedInfoHint">tap to open on your phone</string>
 
     <string id="CatMonument">Monuments &amp; memorials</string>
     <string id="CatCastle">Castles &amp; forts</string>

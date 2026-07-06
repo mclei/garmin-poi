@@ -1,3 +1,4 @@
+import Toybox.Communications;
 import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.System;
@@ -11,6 +12,13 @@ class DetailView extends WatchUi.View {
     private var _poi as Poi;
     private var _scroll as Number;
     private var _maxScroll as Number;
+    // Bounds of the "advanced info" link as last drawn, so the delegate can
+    // hit-test taps against it (the link scrolls with the content). Zero width
+    // means it was not drawn this frame.
+    private var _linkX as Number;
+    private var _linkY as Number;
+    private var _linkW as Number;
+    private var _linkH as Number;
 
     function initialize(model as PoiModel, poi as Poi) {
         View.initialize();
@@ -18,6 +26,10 @@ class DetailView extends WatchUi.View {
         _poi = poi;
         _scroll = 0;
         _maxScroll = 0;
+        _linkX = 0;
+        _linkY = 0;
+        _linkW = 0;
+        _linkH = 0;
     }
 
     function scrollBy(dy as Number) as Void {
@@ -34,6 +46,41 @@ class DetailView extends WatchUi.View {
             _model.targetPoi = _poi;
         }
         WatchUi.requestUpdate();
+    }
+
+    // True if (x, y) landed on the "advanced info" link as last drawn, with a
+    // forgiving margin. False when the link is scrolled out of view / not drawn.
+    function linkHit(x as Number, y as Number) as Boolean {
+        if (_linkW <= 0) { return false; }
+        var pad = 12;
+        return (x >= _linkX - pad) && (x <= _linkX + _linkW + pad)
+            && (y >= _linkY - pad) && (y <= _linkY + _linkH + pad);
+    }
+
+    // Open this POI's page on the connected phone's browser. Prefer the OSM
+    // element page (carries the full tag set / advanced info); if the element
+    // reference is missing, fall back to a map pin at the coordinates.
+    function openPhonePage() as Void {
+        if (Communications has :openWebPage) {
+            Communications.openWebPage(poiUrl(), {}, {});
+        }
+    }
+
+    private function poiUrl() as String {
+        var t = _poi.osmType;
+        if (_poi.osmId.length() > 0) {
+            var kind = null;
+            if (t.equals("N")) { kind = "node"; }
+            else if (t.equals("W")) { kind = "way"; }
+            else if (t.equals("R")) { kind = "relation"; }
+            if (kind != null) {
+                return "https://www.openstreetmap.org/" + kind + "/" + _poi.osmId;
+            }
+        }
+        var lat = _poi.lat.format("%.5f");
+        var lon = _poi.lon.format("%.5f");
+        return "https://www.openstreetmap.org/?mlat=" + lat + "&mlon=" + lon
+             + "#map=18/" + lat + "/" + lon;
     }
 
     function onUpdate(dc as Dc) as Void {
@@ -66,17 +113,26 @@ class DetailView extends WatchUi.View {
         if (_maxScroll < 0) { _maxScroll = 0; }
         if (_scroll > _maxScroll) { _scroll = _maxScroll; }
 
-        // Draw.
+        // Draw. Reset the link footprint; it is re-recorded below if drawn.
+        _linkW = 0;
         var y = pad - _scroll;
         for (var i = 0; i < blocks.size(); i++) {
             var b = blocks[i];
             var font = b[1];
             var fh = dc.getFontHeight(font);
             var lines = wrapText(dc, b[0], font, maxW);
+            var isLink = (b.size() > 3 && b[3] == :link);
             for (var j = 0; j < lines.size(); j++) {
                 if (y + fh > 0 && y < h) {
                     dc.setColor(b[2], Graphics.COLOR_TRANSPARENT);
                     dc.drawText(tx, y, font, lines[j], just);
+                }
+                if (isLink) {
+                    var lw = dc.getTextWidthInPixels(lines[j], font);
+                    _linkX = round ? (tx - lw / 2) : tx;
+                    _linkY = y;
+                    _linkW = lw;
+                    _linkH = fh;
                 }
                 y += fh + 2;
             }
@@ -123,6 +179,12 @@ class DetailView extends WatchUi.View {
     private function buildBlocks() as Array {
         var b = [] as Array;
         buildPoiBlocks(b);
+        // Tappable link that opens this POI's full page on the paired phone.
+        b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
+        b.add([WatchUi.loadResource(Rez.Strings.AdvancedInfo) as String,
+               Graphics.FONT_XTINY, Graphics.COLOR_BLUE, :link]);
+        b.add([WatchUi.loadResource(Rez.Strings.AdvancedInfoHint) as String,
+               Graphics.FONT_XTINY, Graphics.COLOR_DK_GRAY]);
         // common footer
         b.add(["", Graphics.FONT_XTINY, Graphics.COLOR_BLACK]);
         var locked = (_model.targetPoi == _poi) ? "locked" : "not locked";
@@ -205,6 +267,17 @@ class DetailDelegate extends WatchUi.BehaviorDelegate {
         var d = evt.getDirection();
         if (d == WatchUi.SWIPE_UP) { _view.scrollBy(80); return true; }
         if (d == WatchUi.SWIPE_DOWN) { _view.scrollBy(-80); return true; }
+        return false;
+    }
+
+    // A tap on the "advanced info" link opens the POI page on the phone;
+    // taps elsewhere fall through (so scrolling/behaviors are unaffected).
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        var c = evt.getCoordinates();
+        if (c != null && c.size() >= 2 && _view.linkHit(c[0], c[1])) {
+            _view.openPhonePage();
+            return true;
+        }
         return false;
     }
 
