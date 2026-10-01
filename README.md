@@ -189,9 +189,10 @@ diagnostic for tuning the calibration check.
 ## CI (GitHub Actions)
 
 `.github/workflows/build.yml` builds the app on every push/PR and uploads
-`Ahead.prg` as a workflow artifact (download it from the run page and
-sideload it). On `v*` tags it additionally exports the store package
-(`Ahead.iq`).
+`Ahead-venux1.prg` and `Ahead-venusq2.prg` as the workflow artifact
+`Ahead-prg` (download it from the run page and sideload it). On `v*` tags it
+additionally builds release `.prg` files for every device in the manifest
+(artifact `Ahead-release-prg`) and exports the store package (`Ahead.iq`).
 
 Store listing (name "Ahead: What's That Landmark", texts, privacy, OSM
 credit): `store/STORE.md`. Tag (release) builds fail without the

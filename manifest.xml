@@ -11,6 +11,7 @@
         <iq:products>
             <!-- square AMOLED -->
             <iq:product id="venux1"/>
+            <iq:product id="venusq2"/>
             <!-- round AMOLED -->
             <iq:product id="venu2"/>
             <iq:product id="venu2s"/>

@@ -89,14 +89,42 @@ jobs:
 
       - name: Build (venux1)
         run: |
-          monkeyc -d venux1 -f monkey.jungle -o Ahead.prg \
+          monkeyc -d venux1 -f monkey.jungle -o Ahead-venux1.prg \
             -y developer_key.der -w
 
-      - name: Upload sideloadable app
+      - name: Build (venusq2)
+        run: |
+          monkeyc -d venusq2 -f monkey.jungle -o Ahead-venusq2.prg \
+            -y developer_key.der -w
+
+      - name: Upload sideloadable apps
         uses: actions/upload-artifact@v4
         with:
-          name: Ahead-venux1
-          path: Ahead.prg
+          name: Ahead-prg
+          path: Ahead-*.prg
+          if-no-files-found: error
+
+      # On v* tags: release (-r) .prg for every device in the manifest
+      - name: Release build (all devices)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p release
+          IDS=$(sed -n 's/.*<iq:product id="\([^"]*\)".*/\1/p' manifest.xml)
+          N=0
+          for d in $IDS; do
+            echo "== $d"
+            monkeyc -d "$d" -f monkey.jungle -o "release/Ahead-$d.prg" -y developer_key.der -r -w
+            N=$((N + 1))
+          done
+          echo "built $N devices"
+          [ "$N" -gt 0 ]
+
+      - name: Upload release builds
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ahead-release-prg
+          path: release/Ahead-*.prg
           if-no-files-found: error
 
       # On version tags, also produce the store-upload package (.iq)
