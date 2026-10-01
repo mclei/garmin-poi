@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
     <iq:application
-        id="f3a7c2d84b6e49a1b5d2c8e7f0a3b6c9"
+        id="e8512c01ca8842a19c78ec257fe4da78"
         type="watch-app"
         version="0.1.0"
         name="@Strings.AppName"
