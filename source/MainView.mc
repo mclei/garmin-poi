@@ -123,7 +123,7 @@ class MainView extends WatchUi.View {
         // draw farthest first so near dots end up on top
         for (var i = n - 1; i >= 0; i--) {
             var p = vis[i];
-            var rr = p.distance / POI_RANGE;
+            var rr = p.distance / _model.maxRadiusM.toFloat();
             if (rr > 1.0) { rr = 1.0; }
             rr = Math.sqrt(rr).toFloat();
             var rpx = (ring - 28) * rr;

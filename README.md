@@ -45,7 +45,8 @@ SDK Manager.
   re-filters live from the already-loaded data (no refetch), with hysteresis so
   POIs near the edge don't flicker.
 - **Range** — an *expanding search* that widens until it has found enough POIs
-  (about 10), or reaches 5 km. A tight radius with only a hit or two keeps
+  (about 10), or reaches the **search distance** (menu → Search distance or the
+  phone settings: 1 km default, 2 / 5 / 10 km). A tight radius with only a hit or two keeps
   widening so you get a useful set, not just the single closest thing. It starts
   at **50 m** on a good fix (**200 m** on a usable one), so in a city it shows
   exactly what's right in front of you. POIs come from Photon's `/reverse`
@@ -63,6 +64,11 @@ SDK Manager.
   position is read both from location events and by polling the shared GPS
   state, so it still acquires while an **activity is recording** (whose GPS
   would otherwise pre-empt the event callback).
+- **Cache** — the last search (places, where and when) is kept in
+  `Application.Storage`. Opened again within 300 m of that place (by the
+  last-known position) and within 7 days, the app shows the cached places at
+  once, provisional (`~`), and searches again in the background; the cached
+  list stays until the new search stops widening, so it doesn't shrink first.
 - **Glance** — in the watch's glance carousel, Ahead shows the place in front
   of you ("Charles Bridge  120 m"). It fetches on demand *when it scrolls into
   view*: reads the last-known position and runs one small POI query (1.5 km,
@@ -173,8 +179,8 @@ The launcher icon can be regenerated with `python3 scripts/make_icon.py`.
 ## Settings
 
 Via Garmin Connect Mobile (or Connect IQ Store app) → Ahead →
-Settings: max places and the category toggles. (POIs auto-expand 200 m→5 km
-and need no radius setting.) Category toggles changed on the watch are
+Settings: max places, search distance and the category toggles (the search
+widens from 50 m up to the search distance). Category toggles changed on the watch are
 persisted and synced back. The developer-only `debugCompass` property (off,
 not shown in the settings) prints the live magnetometer readout
 (`m <min>-<max> r<swing> s<spread>`) at the top of the main screen — a
@@ -215,7 +221,7 @@ and push — the workflow runs automatically.
 |---------|-------|
 | Status shows `retrying...` | A Photon request failed transiently (e.g. brief rate-limiting, surfacing as `-400`). The app just retries and it clears within a second or two. |
 | Status shows `no phone` | Watch not connected to the phone / no internet (`-104`) — this one needs you to act. |
-| `0 POI` everywhere | All categories disabled, or genuinely nothing within 5 km — open Filters (Start button) and enable categories |
+| `0 POI` everywhere | All categories disabled, or genuinely nothing within the search distance — open Filters and enable categories or widen the distance |
 | Arrow points the wrong way / compass frozen | Open Filters → **Calibrate compass** and wave the watch in a figure-8 until "N" points north. (The OS auto-calibrates from the motion; Connect IQ can't trigger calibration directly. If it stays wrong, recalibrate in the watch's system Sensors settings.) The app also samples the magnetometer (gated by accelerometer motion) and shows **"Compass may need calibration"** when the field magnitude swings too much as you turn — a soft hint, since nearby metal/magnets distort the field too. |
 
 ## Adding more devices

@@ -52,7 +52,7 @@ class DetailView extends WatchUi.View {
     // forgiving margin. False when the link is scrolled out of view / not drawn.
     function linkHit(x as Number, y as Number) as Boolean {
         if (_linkW <= 0) { return false; }
-        var pad = 12;
+        var pad = 16;
         return (x >= _linkX - pad) && (x <= _linkX + _linkW + pad)
             && (y >= _linkY - pad) && (y <= _linkY + _linkH + pad);
     }
@@ -128,11 +128,19 @@ class DetailView extends WatchUi.View {
                     dc.drawText(tx, y, font, lines[j], just);
                 }
                 if (isLink) {
+                    // footprint = union of all lines of the (possibly wrapped) link
                     var lw = dc.getTextWidthInPixels(lines[j], font);
-                    _linkX = round ? (tx - lw / 2) : tx;
-                    _linkY = y;
-                    _linkW = lw;
-                    _linkH = fh;
+                    var lx = round ? (tx - lw / 2) : tx;
+                    if (_linkW <= 0) {
+                        _linkX = lx;
+                        _linkY = y;
+                        _linkW = lw;
+                    } else {
+                        var right = (_linkX + _linkW > lx + lw) ? _linkX + _linkW : lx + lw;
+                        if (lx < _linkX) { _linkX = lx; }
+                        _linkW = right - _linkX;
+                    }
+                    _linkH = y + fh - _linkY;
                 }
                 y += fh + 2;
             }
@@ -270,19 +278,24 @@ class DetailDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    // A tap on the "advanced info" link opens the POI page on the phone;
-    // taps elsewhere fall through (so scrolling/behaviors are unaffected).
+    // Touch is handled here completely: a tap on the "advanced info" link opens
+    // the POI page on the phone, a tap elsewhere locks/unlocks the target. The
+    // tap is not left to the onSelect behaviour: on some devices a tap also
+    // produces onSelect, which toggled the lock even when the link was hit.
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
         var c = evt.getCoordinates();
         if (c != null && c.size() >= 2 && _view.linkHit(c[0], c[1])) {
             _view.openPhonePage();
-            return true;
+        } else {
+            _view.toggleTarget();
         }
-        return false;
+        return true;
     }
 
     function onKey(evt as WatchUi.KeyEvent) as Boolean {
         var k = evt.getKey();
+        // Physical Start/Enter button: lock/unlock
+        if (k == WatchUi.KEY_ENTER) { _view.toggleTarget(); return true; }
         if (k == WatchUi.KEY_DOWN) { _view.scrollBy(80); return true; }
         if (k == WatchUi.KEY_UP) { _view.scrollBy(-80); return true; }
         return false;
@@ -298,8 +311,9 @@ class DetailDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
+    // Taps and the Start button are handled in onTap / onKey; ignore the
+    // behaviour so a tap never toggles the lock twice.
     function onSelect() as Boolean {
-        _view.toggleTarget();
         return true;
     }
 }

@@ -17,11 +17,23 @@ import Toybox.WatchUi;
 const PHOTON_URL = "https://photon.komoot.io/reverse";
 
 // Land POIs use an expanding search: start tight and widen only when nothing
-// is found, up to 5 km. The starting radius depends on GPS precision (50 m on
+// is found, up to the search distance chosen in the menu (maxRadiusM, 1-10 km). The starting radius depends on GPS precision (50 m on
 // a good fix, wider when approximate) - see startLadderIndex(). In a dense
 // city you stop almost immediately (tiny response); in open country you reach
 // far, where there is little to return anyway.
-const POI_RADII = [50, 100, 200, 500, 1000, 2000, 5000] as Array<Number>;
+const POI_RADII = [50, 100, 200, 500, 1000, 2000, 5000, 10000] as Array<Number>;
+
+// Search distance choices (menu / phone settings), metres; default 1 km.
+const RADIUS_CHOICES = [1000, 2000, 5000, 10000] as Array<Number>;
+const DEFAULT_RADIUS = 1000;
+
+// Cache of the last search (Application.Storage): when the app is opened again
+// within CACHE_NEAR_M of where it was fetched and not older than CACHE_MAX_AGE,
+// the cached places are shown at once (around the last-known position, marked
+// "~") while a fresh search runs in the background.
+const CACHE_KEY = "poiCache";
+const CACHE_NEAR_M = 300.0;
+const CACHE_MAX_AGE = 604800;   // 7 days, seconds
 
 // Cap on returned features (Photon `limit`), so a dense stopping radius can't
 // produce a response too large to parse on-watch. Photon features are ~350
@@ -41,8 +53,6 @@ const POI_MIN_RESULTS = 10;
 const FOV_ENTER = 45.0;
 const FOV_EXIT = 55.0;
 
-// Range used to scale the radar dots (matches the widest expanding radius).
-const POI_RANGE = 5000.0;
 
 // Compass smoothing: ignore heading jitter smaller than the deadband, and ease
 // toward larger (real) changes so the display doesn't twitch with magnetometer
@@ -102,6 +112,8 @@ class PoiModel {
 
     // Settings
     public var maxPois as Number;
+    public var maxRadiusM as Number;     // search distance (also scales the radar)
+    private var _cacheHold as Boolean;   // showing cached places until the new search settles
     public var catEnabled as Array<Boolean>;
 
     private var _fetchPending as Boolean;
@@ -142,6 +154,8 @@ class PoiModel {
         poiStatus = STATUS_IDLE;
         poiError = 0;
         maxPois = 40;
+        maxRadiusM = DEFAULT_RADIUS;
+        _cacheHold = false;
         catEnabled = new Array<Boolean>[NUM_CATS];
         for (var c = 0; c < NUM_CATS; c++) {
             catEnabled[c] = PoiCat.defaultEnabled(c);
@@ -162,9 +176,10 @@ class PoiModel {
     function start() as Void {
         Position.enableLocationEvents(Position.LOCATION_CONTINUOUS,
                                       method(:onPosition));
-        // Deliberately NO cached/last-known seed: we wait for a usable-or-better
-        // fix before showing anything, so POIs are never placed around a stale
-        // or coarse position. onPosition accepts the first qualifying fix.
+        // No last-known seed in general: we wait for a usable-or-better fix, so
+        // POIs are never placed around a stale or coarse position. The exception
+        // is the cache of the last search when we are still near that place.
+        loadCache();
     }
 
     function stop() as Void {
@@ -178,6 +193,12 @@ class PoiModel {
         maxPois = getNumProp("maxPois", 40);
         if (maxPois < 10) { maxPois = 10; }
         if (maxPois > 100) { maxPois = 100; }
+        var r = getNumProp("maxRadius", DEFAULT_RADIUS);
+        if (r != maxRadiusM && r >= 500 && r <= 10000) {
+            var wider = r > maxRadiusM;
+            maxRadiusM = r;
+            if (wider) { _needPoiFetch = true; }   // a wider search can find more
+        }
         debugCompass = getBoolProp("debugCompass", false);
         var arr = new Array<Boolean>[NUM_CATS];
         for (var c = 0; c < NUM_CATS; c++) {
@@ -203,6 +224,24 @@ class PoiModel {
             _needPoiFetch = true;
         }
         _dirty = true;
+    }
+
+    // Search distance from the menu: stored like the phone setting, new search.
+    function setMaxRadius(m as Number) as Void {
+        maxRadiusM = m;
+        try {
+            Application.Properties.setValue("maxRadius", m);
+        } catch (e) {
+        }
+        _dirty = true;
+        forceRefresh();
+    }
+
+    // Last step of the expanding search within the search distance.
+    private function maxLadderIdx() as Number {
+        var i = 0;
+        while (i + 1 < POI_RADII.size() && POI_RADII[i + 1] <= maxRadiusM) { i++; }
+        return i;
     }
 
     function forceRefresh() as Void {
@@ -234,6 +273,7 @@ class PoiModel {
         if (lat != null) { _fetchLat = lat; _fetchLon = lon; }
         _lastPoiAttemptSec = Time.now().value();
         pois = [] as Array<Poi>;    // drop stale data of other categories
+        _cacheHold = false;
         _oneShotPending = true;     // trigger a fetch for just this category
     }
 
@@ -546,8 +586,9 @@ class PoiModel {
     // user-chosen last-known fix (which can be quite stale). The ladder widens
     // from there if too few POIs are found.
     private function startLadderIndex() as Number {
-        if (usingLastKnown) { return 3; }   // cached fix can be off -> start at 500 m
-        return (gpsQuality >= Position.QUALITY_GOOD) ? 0 : 2;
+        var i = usingLastKnown ? 3 : ((gpsQuality >= Position.QUALITY_GOOD) ? 0 : 2);
+        var m = maxLadderIdx();
+        return i < m ? i : m;
     }
 
     // Human-readable current GPS precision, shown on the "acquiring" screen
@@ -665,8 +706,15 @@ class PoiModel {
             // background if there are still too few. Each wider circle is a
             // superset, so the on-screen list just grows as the steps return -
             // the nearest points appear immediately, no waiting for 10.
-            finalizePois(fresh);
-            if (fresh.size() < POI_MIN_RESULTS && _ladderIdx < POI_RADII.size() - 1) {
+            var widen = fresh.size() < POI_MIN_RESULTS && _ladderIdx < maxLadderIdx();
+            // Cached places stay on screen until the new search stops widening,
+            // so the list doesn't shrink to the first tight circle's few hits.
+            if (!(_cacheHold && widen)) {
+                finalizePois(fresh);
+                _cacheHold = false;
+                saveCache();
+            }
+            if (widen) {
                 _ladderIdx++;
                 fetchPois();
             }
@@ -694,6 +742,69 @@ class PoiModel {
         _dirty = true;
         poiStatus = STATUS_IDLE;
         poiError = 0;
+    }
+
+    // ---- cache of the last search ----
+
+    // Store the current places with where/when they were fetched. Not for a
+    // one-shot category search (that is not the user's normal view).
+    private function saveCache() as Void {
+        if (_oneShotCat >= 0 || _fetchLat == null || pois.size() == 0) { return; }
+        var list = [];
+        for (var i = 0; i < pois.size(); i++) {
+            var p = pois[i];
+            list.add([p.name, p.lat.toFloat(), p.lon.toFloat(), p.category, p.detail,
+                      p.osmType, p.osmId, p.addr]);
+        }
+        try {
+            Application.Storage.setValue(CACHE_KEY, [(_fetchLat as Double).toFloat(),
+                (_fetchLon as Double).toFloat(), Time.now().value(), _fetchedMask, list]);
+        } catch (e) {
+            // storage full or value too large - the cache is optional
+        }
+    }
+
+    // On start: if the last-known position is near the cached search and the
+    // cache is recent, show the cached places right away and search again in
+    // the background (a real fix also triggers a new search, see applyFix).
+    private function loadCache() as Void {
+        var c = null;
+        try {
+            c = Application.Storage.getValue(CACHE_KEY);
+        } catch (e) {
+        }
+        if (!(c instanceof Array) || c.size() < 5 || !(c[4] instanceof Array)) { return; }
+        if (Time.now().value() - (c[2] as Number) > CACHE_MAX_AGE) { return; }
+        var info = Position.getInfo();
+        if (info == null || info.position == null) { return; }
+        var deg = info.position.toDegrees();
+        var cla = (c[0] as Float).toDouble();
+        var clo = (c[1] as Float).toDouble();
+        if (GeoUtils.distanceM(deg[0].toDouble(), deg[1].toDouble(), cla, clo) > CACHE_NEAR_M) { return; }
+        var out = [] as Array<Poi>;
+        var list = c[4] as Array;
+        for (var i = 0; i < list.size(); i++) {
+            var e = list[i];
+            if (!(e instanceof Array) || e.size() < 8) { continue; }
+            var p = new Poi(e[0] as String, (e[1] as Float).toDouble(), (e[2] as Float).toDouble(),
+                            e[3] as Number, e[4] as String);
+            p.osmType = e[5] as String;
+            p.osmId = e[6] as String;
+            p.addr = e[7] as String;
+            out.add(p);
+        }
+        if (out.size() == 0) { return; }
+        lat = deg[0].toDouble();
+        lon = deg[1].toDouble();
+        usingLastKnown = true;          // provisional ("~") until a real fix
+        _fetchLat = cla;
+        _fetchLon = clo;
+        _fetchedMask = c[3] as Number;
+        finalizePois(out);
+        _cacheHold = true;
+        _needPoiFetch = true;           // refresh in the background
+        _lastPoiAttemptSec = 0;
+        updateDerived();
     }
 
     // Parse Photon's GeoJSON FeatureCollection. Each feature is:

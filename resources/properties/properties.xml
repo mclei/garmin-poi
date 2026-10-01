@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <properties>
     <property id="maxPois" type="number">40</property>
+    <property id="maxRadius" type="number">1000</property>
     <!-- developer-only magnetometer readout; not exposed in the phone settings -->
     <property id="debugCompass" type="boolean">false</property>
 

@@ -15,6 +15,9 @@ module PoiUi {
                 null, c, model.catEnabled[c], null));
         }
         menu.addItem(new WatchUi.MenuItem(
+            WatchUi.loadResource(Rez.Strings.MenuDistance) as String,
+            distanceLabel(model.maxRadiusM), "distance", null));
+        menu.addItem(new WatchUi.MenuItem(
             WatchUi.loadResource(Rez.Strings.MenuRefresh) as String,
             null, "refresh", null));
         menu.addItem(new WatchUi.MenuItem(
@@ -30,6 +33,24 @@ module PoiUi {
             null, "aboutApp", null));
         // Opened by the right-edge swipe -> slide in from the right.
         WatchUi.pushView(menu, new FilterMenuDelegate(model), WatchUi.SLIDE_LEFT);
+    }
+
+    function distanceLabel(m as Number) as String {
+        return (m / 1000).toString() + " km";
+    }
+
+    // Search distance list; the cursor starts on the current value.
+    function pushDistanceMenu(model as PoiModel) as Void {
+        var menu = new WatchUi.Menu2({
+            :title => WatchUi.loadResource(Rez.Strings.MenuDistance)
+        });
+        var focus = 0;
+        for (var i = 0; i < RADIUS_CHOICES.size(); i++) {
+            menu.addItem(new WatchUi.MenuItem(distanceLabel(RADIUS_CHOICES[i]), null, i, null));
+            if (RADIUS_CHOICES[i] == model.maxRadiusM) { focus = i; }
+        }
+        menu.setFocus(focus);
+        WatchUi.pushView(menu, new DistanceMenuDelegate(model), WatchUi.SLIDE_LEFT);
     }
 
     function pushPoiList(model as PoiModel) as Void {
@@ -129,6 +150,10 @@ class FilterMenuDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return;
         }
+        if (id instanceof String && id.equals("distance")) {
+            PoiUi.pushDistanceMenu(_model);
+            return;
+        }
         if (id instanceof String && id.equals("aboutApp")) {
             WatchUi.pushView(new AboutView(), new WatchUi.BehaviorDelegate(), WatchUi.SLIDE_LEFT);
             return;
@@ -168,5 +193,24 @@ class PoiListDelegate extends WatchUi.Menu2InputDelegate {
                 PoiUi.pushDetail(_model, _items[id]); // list item -> detail page
             }
         }
+    }
+}
+
+// Applies the chosen search distance and reopens the filters menu so its row
+// shows the new value.
+class DistanceMenuDelegate extends WatchUi.Menu2InputDelegate {
+
+    private var _model as PoiModel;
+
+    function initialize(model as PoiModel) {
+        Menu2InputDelegate.initialize();
+        _model = model;
+    }
+
+    function onSelect(item as WatchUi.MenuItem) as Void {
+        _model.setMaxRadius(RADIUS_CHOICES[item.getId() as Number]);
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);   // distance list
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);   // old filters menu
+        PoiUi.pushFilterMenu(_model);
     }
 }

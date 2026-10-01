@@ -30,7 +30,8 @@ WHAT YOU SEE
   straight at it.
 • Nearby places as coloured dots on a compass ring.
 • A detail page with the type, distance and bearing, street address and coordinates, and a
-  link that opens the place on your phone.
+  link that opens the place on your phone. Tap elsewhere (or press Start) to lock the place
+  as your target.
 • A list of everything nearby, sorted by distance, ahead of you or all around (360°).
 • A glance that shows the place in front of you right from the watch face.
 
@@ -43,7 +44,12 @@ without changing your settings.
 
 SMART RANGE
 In a city Ahead looks only a few dozen metres around you; in the countryside the search
-widens up to 5 km until it finds enough places.
+widens until it finds enough places, up to the search distance you choose in the menu
+(1 km by default, up to 10 km).
+
+INSTANT START
+Ahead remembers the places it found last time. Open it again nearby and they are on the
+screen at once, while a fresh search runs in the background.
 
 LOCK A TARGET
 Pick a place from the list and the arrow keeps pointing at it as you walk, until you clear
@@ -84,7 +90,7 @@ Ahead needs a connection to your phone with Garmin Connect running and internet 
 
 **I see nothing nearby.**
 Check that some categories are turned on (menu → Filters). In remote places there may simply
-be no mapped places within 5 km.
+be no mapped places within the search distance; increase it in the menu (up to 10 km).
 
 **Where does the data come from?**
 From OpenStreetMap, the free map edited by volunteers. If a place is missing or wrong, you can

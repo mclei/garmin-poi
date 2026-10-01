@@ -4,6 +4,15 @@
         <settingConfig type="numeric" min="10" max="100"/>
     </setting>
 
+    <setting propertyKey="@Properties.maxRadius" title="@Strings.SetMaxRadius">
+        <settingConfig type="list">
+            <listEntry value="1000">@Strings.Dist1</listEntry>
+            <listEntry value="2000">@Strings.Dist2</listEntry>
+            <listEntry value="5000">@Strings.Dist5</listEntry>
+            <listEntry value="10000">@Strings.Dist10</listEntry>
+        </settingConfig>
+    </setting>
+
     <setting propertyKey="@Properties.catViewpoint" title="@Strings.CatViewpoint">
         <settingConfig type="boolean"/>
     </setting>
