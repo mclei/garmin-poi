@@ -5,8 +5,13 @@ Echoes the app's own UI: a compass ring, nearby places as colored radar dots,
 and the green arrow pointing at the place you're facing. Rendered at 4x and
 downsampled with LANCZOS for smooth edges. Pure Pillow, no network.
 
-    python3 scripts/make_cover.py            # -> store/cover_500.png
+    python3 scripts/make_cover.py [--font Quicksand.ttf]   # -> store/cover_500.png
+
+--font takes the variable Quicksand TTF (OFL,
+https://github.com/google/fonts/raw/main/ofl/quicksand/Quicksand%5Bwght%5D.ttf);
+without it the static Quicksand files from /usr/share/fonts are used.
 """
+import argparse
 import math
 import os
 from PIL import Image, ImageDraw, ImageFont
@@ -48,7 +53,19 @@ def polar(bearing_deg, dist):
     return (CX + dist * math.sin(th), CY - dist * math.cos(th))
 
 
+def qfont(path, weight, px):
+    """Quicksand at px: the variable font set to weight, or the static file."""
+    if path:
+        f = ImageFont.truetype(path, px)
+        f.set_variation_by_name(weight)
+        return f
+    return ImageFont.truetype(F_TITLE if weight == "Bold" else F_TAG, px)
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--font", help="variable Quicksand TTF")
+    args = ap.parse_args()
     img = Image.new("RGB", (S, S), (5, 8, 13))
     # Vertical gradient: deep blue at the top fading to near-black at the bottom.
     top, bot = (0x10, 0x27, 0x3C), (0x05, 0x08, 0x0D)
@@ -84,7 +101,7 @@ def main():
         d.line([p1, p2], fill=col, width=(3 * SS if major else 1 * SS))
 
     # Cardinal letters.
-    cf = ImageFont.truetype(F_CARD, 26 * SS)
+    cf = qfont(args.font, "Medium", 26 * SS)
     for b, label, col in [(0, "N", RED), (90, "E", TAGCOL),
                           (180, "S", TAGCOL), (270, "W", TAGCOL)]:
         px, py = polar(b, R - 36 * SS)
@@ -93,8 +110,8 @@ def main():
                label, font=cf, fill=col)
 
     # Nearby places as radar dots (bearing, distance-fraction, colour).
-    dots = [(45, 0.52, GOLD), (88, 0.78, SKY), (130, 0.52, ROSE),
-            (175, 0.72, PURPLE), (225, 0.58, ORANGE), (270, 0.50, TEAL),
+    dots = [(45, 0.52, GOLD), (72, 0.80, SKY), (130, 0.52, ROSE),
+            (160, 0.74, PURPLE), (225, 0.58, ORANGE), (270, 0.50, TEAL),
             (300, 0.80, LIME)]
     for b, frac, col in dots:
         px, py = polar(b, R * frac)
@@ -143,16 +160,13 @@ def main():
     hr = 7 * SS
     d.ellipse([CX - hr, CY - hr, CX + hr, CY + hr], fill=RING_HI)
 
-    # Title + tagline.
-    tf = ImageFont.truetype(F_TITLE, 76 * SS)
-    title = "Ahead"
-    tb = d.textbbox((0, 0), title, font=tf)
-    d.text((S / 2 - (tb[2] - tb[0]) / 2 - tb[0], 380 * SS), title, font=tf, fill=WHITE)
-
-    gf = ImageFont.truetype(F_TAG, 25 * SS)
-    tag = "the place in front of you"
-    tb = d.textbbox((0, 0), tag, font=gf)
-    d.text((S / 2 - (tb[2] - tb[0]) / 2 - tb[0], 452 * SS), tag, font=gf, fill=TAGCOL)
+    # Title, the rest of the store name ("Ahead: What's That Landmark") and tagline,
+    # centred on baselines like the Zenith cover.
+    for text, font, y, col in [("Ahead", qfont(args.font, "Bold", 70 * SS), 418, WHITE),
+                               ("What's That Landmark", qfont(args.font, "Bold", 30 * SS), 454, WHITE),
+                               ("the place in front of you", qfont(args.font, "Medium", 22 * SS), 484, TAGCOL)]:
+        w = d.textlength(text, font=font)
+        d.text(((S - w) / 2, y * SS), text, font=font, fill=col, anchor="ls")
 
     out_dir = "store"
     os.makedirs(out_dir, exist_ok=True)

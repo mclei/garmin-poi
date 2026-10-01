@@ -175,9 +175,10 @@ The launcher icon can be regenerated with `python3 scripts/make_icon.py`.
 Via Garmin Connect Mobile (or Connect IQ Store app) → Ahead →
 Settings: max places and the category toggles. (POIs auto-expand 200 m→5 km
 and need no radius setting.) Category toggles changed on the watch are
-persisted and synced back. **Show compass debug** prints the live magnetometer
-readout (`m <min>-<max> r<swing> s<spread>`) at the top of the main screen —
-a beta diagnostic for tuning the calibration check; turn it off for normal use.
+persisted and synced back. The developer-only `debugCompass` property (off,
+not shown in the settings) prints the live magnetometer readout
+(`m <min>-<max> r<swing> s<spread>`) at the top of the main screen — a
+diagnostic for tuning the calibration check.
 
 ## CI (GitHub Actions)
 
@@ -185,6 +186,10 @@ a beta diagnostic for tuning the calibration check; turn it off for normal use.
 `Ahead.prg` as a workflow artifact (download it from the run page and
 sideload it). On `v*` tags it additionally exports the store package
 (`Ahead.iq`).
+
+Store listing (name "Ahead: What's That Landmark", texts, privacy, OSM
+credit): `store/STORE.md`. Tag (release) builds fail without the
+`CIQ_DEVELOPER_KEY` secret, so every release is signed with the same key.
 
 It runs inside the community-maintained
 [`ghcr.io/matco/connectiq-tester`](https://github.com/matco/connectiq-tester)

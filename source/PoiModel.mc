@@ -124,7 +124,7 @@ class PoiModel {
         _haveHeading = false;
         calSuspect = false;
         magAvailable = false;
-        debugCompass = true;
+        debugCompass = false;
         dbgMin = 0.0;
         dbgMax = 0.0;
         dbgRatio = 0.0;
@@ -178,7 +178,7 @@ class PoiModel {
         maxPois = getNumProp("maxPois", 40);
         if (maxPois < 10) { maxPois = 10; }
         if (maxPois > 100) { maxPois = 100; }
-        debugCompass = getBoolProp("debugCompass", true);
+        debugCompass = getBoolProp("debugCompass", false);
         var arr = new Array<Boolean>[NUM_CATS];
         for (var c = 0; c < NUM_CATS; c++) {
             arr[c] = getBoolProp(PoiCat.propKey(c), PoiCat.defaultEnabled(c));

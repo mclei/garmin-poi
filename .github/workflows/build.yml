@@ -31,15 +31,46 @@ jobs:
       - name: Prepare developer key
         env:
           DEVELOPER_KEY_B64: ${{ secrets.CIQ_DEVELOPER_KEY }}
+        # Secret = base64 of developer_key.der (base64 -w0). Whitespace and line breaks
+        # (also CRLF from the web form) are tolerated, as is a PEM key (-----BEGIN ...).
         run: |
+          if ! command -v openssl >/dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends openssl
+          fi
           if [ -n "$DEVELOPER_KEY_B64" ]; then
             echo "Using developer key from CIQ_DEVELOPER_KEY secret"
-            echo "$DEVELOPER_KEY_B64" | base64 -d > developer_key.der
-          else
-            echo "No CIQ_DEVELOPER_KEY secret set - generating an ephemeral key"
-            if ! command -v openssl >/dev/null 2>&1; then
-              apt-get update -qq && apt-get install -y -qq --no-install-recommends openssl
+            if printf '%s' "$DEVELOPER_KEY_B64" | grep -q -- "-----BEGIN"; then
+              echo "secret contains a PEM key - converting to DER"
+              printf '%s\n' "$DEVELOPER_KEY_B64" | tr -d '\r' > developer_key.pem
+              openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
+                -in developer_key.pem -out developer_key.der
+            else
+              printf '%s' "$DEVELOPER_KEY_B64" | tr -d ' \t\r\n' | base64 -d > developer_key.der || {
+                echo "::error::CIQ_DEVELOPER_KEY is not valid base64 (expected: base64 -w0 developer_key.der)"
+                exit 1
+              }
+              # base64 of the .pem instead of the .der
+              if head -c 11 developer_key.der | grep -q -- "-----BEGIN"; then
+                echo "secret is base64 of a PEM file - converting to DER"
+                mv developer_key.der developer_key.pem
+                openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
+                  -in developer_key.pem -out developer_key.der
+              fi
             fi
+            openssl pkey -inform DER -in developer_key.der -noout || {
+              echo "::error::CIQ_DEVELOPER_KEY does not decode to a DER private key"
+              exit 1
+            }
+            echo "key OK ($(wc -c < developer_key.der) bytes)"
+          else
+            # A release must be signed with the permanent key (otherwise it is a different
+            # app in the store and on the watch, and settings are lost)
+            case "$GITHUB_REF" in
+              refs/tags/v*)
+                echo "::error::Release build (tag) requires the CIQ_DEVELOPER_KEY secret"
+                exit 1 ;;
+            esac
+            echo "No CIQ_DEVELOPER_KEY secret set - generating an ephemeral key"
             openssl genrsa -out developer_key.pem 4096 2>/dev/null
             openssl pkcs8 -topk8 -inform PEM -outform DER -nocrypt \
               -in developer_key.pem -out developer_key.der
