@@ -14,6 +14,10 @@
     <string id="MenuCalibrate">Calibrate compass</string>
     <string id="AboutData">Map data</string>
     <string id="AboutCredit">© OpenStreetMap contributors</string>
+    <string id="MenuAbout">About</string>
+    <string id="AboutVersion">Version</string>
+    <string id="AboutCredit1">Map data © OpenStreetMap</string>
+    <string id="AboutCredit2">contributors (ODbL)</string>
     <string id="ClearTarget">Clear target</string>
     <string id="MenuShowOnly">Show only (once)</string>
     <string id="MenuMyFilters">Back to my filters</string>

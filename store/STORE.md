@@ -61,7 +61,7 @@ REQUIREMENTS
 3. Tap the screen (or press Start) for the detail page. Start on the detail page locks the
    place as your target.
 4. Swipe up for the list of nearby places, swipe down for a one-off category filter, and
-   swipe in from the right edge for the menu (categories, refresh, compass calibration).
+   swipe in from the right edge for the menu (categories, refresh, compass calibration, About).
 
 ## What's new
 

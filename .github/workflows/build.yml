@@ -76,6 +76,17 @@ jobs:
               -in developer_key.pem -out developer_key.der
           fi
 
+      - name: Stamp build ID and version
+        # source/Build.mc: short commit SHA and the version from manifest.xml (About screen)
+        run: |
+          SHORT=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)
+          VERSION=$(sed -n -e 's/.*<iq:application[^>]* version="\([^"]*\)".*/\1/p' \
+            -e 's/^[[:space:]]*version="\([^"]*\)".*/\1/p' manifest.xml | head -n1)
+          [ -n "$VERSION" ] || { echo "::error::manifest.xml has no version"; exit 1; }
+          sed -i "s/const ID = \"dev\";/const ID = \"$SHORT\";/; s/const VERSION = \"dev\";/const VERSION = \"$VERSION\";/" source/Build.mc
+          grep -q "const VERSION = \"$VERSION\";" source/Build.mc
+          echo "build $SHORT, version $VERSION"
+
       - name: Build (venux1)
         run: |
           monkeyc -d venux1 -f monkey.jungle -o Ahead.prg \

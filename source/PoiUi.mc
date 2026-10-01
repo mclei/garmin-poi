@@ -25,6 +25,9 @@ module PoiUi {
             WatchUi.loadResource(Rez.Strings.AboutData) as String,
             WatchUi.loadResource(Rez.Strings.AboutCredit) as String,
             "about", null));
+        menu.addItem(new WatchUi.MenuItem(
+            WatchUi.loadResource(Rez.Strings.MenuAbout) as String,
+            null, "aboutApp", null));
         // Opened by the right-edge swipe -> slide in from the right.
         WatchUi.pushView(menu, new FilterMenuDelegate(model), WatchUi.SLIDE_LEFT);
     }
@@ -124,6 +127,10 @@ class FilterMenuDelegate extends WatchUi.Menu2InputDelegate {
             _model.forceRefresh();
             // Reverse of the slide-left it opened with.
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            return;
+        }
+        if (id instanceof String && id.equals("aboutApp")) {
+            WatchUi.pushView(new AboutView(), new WatchUi.BehaviorDelegate(), WatchUi.SLIDE_LEFT);
             return;
         }
         if (id instanceof String && id.equals("calibrate")) {

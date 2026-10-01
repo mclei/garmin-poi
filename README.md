@@ -152,7 +152,7 @@ watch's `GARMIN/Apps` folder. The app appears in the activity/app list.
 | Input | Action |
 |-------|--------|
 | **Tap the screen**, or the **Start/Enter button** | Open the **detail page** of the shown POI (scrollable: name, type, distance/bearing, street address and coordinates — all from the Photon result, no extra request) |
-| **Swipe in from the right edge** | Filters menu (settings) — category toggles + "Refresh now" |
+| **Swipe in from the right edge** | Filters menu (settings) — category toggles, "Refresh now", compass calibration, map data credit and About (version, author, contact) |
 | **Swipe down** | Quick "show only one category" — a one-shot (e.g. just restaurants, or just museums) that does **not** change your saved filters; the next normal search reverts to them |
 | Swipe up | Nearest-POI list; select an entry opens its detail page. The first row toggles the field-of-view filter, so you can list POIs in **all directions** (including behind you), not just those ahead |
 | Long-press screen | Filters menu (only where the firmware emits it) |
