@@ -3,7 +3,7 @@
     <iq:application
         id="e8512c01ca8842a19c78ec257fe4da78"
         type="watch-app"
-        version="0.1.0"
+        version="1.0.0"
         name="@Strings.AppName"
         entry="AheadApp"
         launcherIcon="@Drawables.LauncherIcon"
