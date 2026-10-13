@@ -216,6 +216,15 @@ base64 -w0 developer_key.der   # paste output into the secret
 To enable CI: `git init && git add . && git commit`, create a GitHub repo
 and push — the workflow runs automatically.
 
+## Website (leisoft.cz)
+
+The support page with the privacy policy is in `web/` and is published at
+https://leisoft.cz/garmin/ahead/ (`privacy.html` is the Privacy policy URL for the Connect IQ
+Store). The site is assembled in `leisoft-web` (entry in `sites.yml`); a push of a change in
+`web/**` to `master` triggers the rebuild through `.github/workflows/publish.yml` (secret
+`WEB_DISPATCH_TOKEN`). Links inside `web/` must be relative, no symlinks. The screenshots in
+`web/img/` are copies of `store/screenshot_venux1_448x486.png`; copy them again after regenerating.
+
 ## Troubleshooting
 
 | Symptom | Cause |

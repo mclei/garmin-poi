@@ -1,0 +1,27 @@
+name: Publish leisoft.cz
+
+on:
+  push:
+    branches: [master]
+    # Rebuild webu jen při změně webu aplikace (odpovídá "source" v sites.yml).
+    paths: ['web/**']
+  # Vydání vytvořené ručně na GitHubu (soubory ke stažení, viz "release" v sites.yml).
+  release:
+    types: [published]
+  # Volání z workflow, které vydání vytváří (vydání vytvořené přes GITHUB_TOKEN workflow nespouští).
+  workflow_call:
+    secrets:
+      WEB_DISPATCH_TOKEN:
+        required: true
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger build in web-build
+        env:
+          GH_TOKEN: ${{ secrets.WEB_DISPATCH_TOKEN }}
+        run: gh workflow run deploy.yml -R "${{ github.repository_owner }}/web-build" --ref master

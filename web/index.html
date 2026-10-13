@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ahead: What's That Landmark · LEI soft</title>
+  <meta name="description" content="Ahead for Garmin watches: point your wrist at a building, castle or viewpoint and see what it is and how far away.">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1rem; }
+    .shots img { width: 100%; height: auto; }
+    .list { list-style: disc; padding-left: 1.25rem; }
+    .list li { margin: .25rem 0; }
+    ol { padding-left: 1.25rem; }
+    dt { margin-top: 1rem; font-weight: 600; }
+    dd { margin: .25rem 0 0; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <p><a href="/">← LEI soft</a></p>
+
+  <header>
+    <h1>Ahead<span>What's That Landmark</span></h1>
+    <p class="lead">Point your wrist at a building, castle or viewpoint and see what it is and how far away.</p>
+  </header>
+
+  <main>
+    <p>What's that place I'm looking at? Ahead names the landmark in front of you. Point your
+      wrist, and the watch shows the place you are facing with its name, distance and type. Turn
+      around and it updates to whatever you face now.</p>
+
+    <section>
+      <h2>Screenshots</h2>
+      <div class="shots">
+        <img src="img/screenshot_venux1.png" width="448" height="486" alt="The place in front of you with its distance and a direction arrow, nearby places on a compass ring">
+      </div>
+    </section>
+
+    <section>
+      <h2>What you see</h2>
+      <ul class="list">
+        <li>The place in front of you, large, with a direction arrow that turns green when you
+          point straight at it.</li>
+        <li>Nearby places as coloured dots on a compass ring.</li>
+        <li>A detail page with the type, distance and bearing, street address and coordinates,
+          and a link that opens the place on your phone.</li>
+        <li>A list of everything nearby, sorted by distance, ahead of you or all around
+          (360°).</li>
+        <li>A glance that shows the place in front of you right from the watch face.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Places</h2>
+      <p>Viewpoints and attractions, parks and nature, monuments and memorials, castles and
+        forts, ruins and archaeological sites, places of worship, museums and galleries, theatres
+        and cinemas, restaurants, cafés and bars. Turn each category on or off on the watch or in
+        the phone settings. A one-off filter shows just one category (for example only
+        restaurants) without changing your settings.</p>
+      <p>In a city Ahead looks only a few dozen metres around you; in the countryside the search
+        widens until it finds enough places, up to the search distance you choose in the menu
+        (1 km by default, up to 10 km). It remembers the places it found last time, so when you
+        open it again nearby they are on the screen at once.</p>
+      <p>Pick a place from the list and the arrow keeps pointing at it as you walk, until you
+        clear the lock.</p>
+    </section>
+
+    <section>
+      <h2>How to use</h2>
+      <ol>
+        <li>Start Ahead outdoors and wait for GPS ("Acquiring GPS"), or tap "Use last known" to
+          start right away from your last position.</li>
+        <li>Point the watch where you are looking. The place in front of you is shown large.</li>
+        <li>Tap the screen (or press Start) for the detail page. Start on the detail page locks
+          the place as your target.</li>
+        <li>Swipe up for the list of nearby places, swipe down for a one-off category filter, and
+          swipe in from the right edge for the menu (categories, refresh, compass calibration,
+          About).</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Requirements</h2>
+      <ul class="list">
+        <li>A Garmin watch with GPS and a compass (magnetometer).</li>
+        <li>A paired phone with Garmin Connect and an internet connection. Places are looked up
+          online.</li>
+      </ul>
+      <p>Supported watches: Venu X1, Venu 2/2 Plus/2S/3/3S, Venu Sq 2, vívoactive 5,
+        Forerunner 165/255/255S/265/265S/955/965, fēnix 7/7S/7X, epix (Gen 2).</p>
+    </section>
+
+    <section>
+      <h2>FAQ</h2>
+      <dl>
+        <dt>The arrow points the wrong way.</dt>
+        <dd>Calibrate the compass: menu → Calibrate compass, then draw a figure eight with your
+          arm. If it stays wrong, calibrate the compass in the watch settings (Sensors → Compass),
+          away from metal.</dd>
+
+        <dt>It says "no phone" or shows an error.</dt>
+        <dd>Ahead needs a connection to your phone with Garmin Connect running and internet
+          access.</dd>
+
+        <dt>I see nothing nearby.</dt>
+        <dd>Check that some categories are turned on (menu → Filters). In remote places there may
+          simply be no mapped places within the search distance; increase it in the menu (up to
+          10 km).</dd>
+
+        <dt>Where does the data come from?</dt>
+        <dd>From OpenStreetMap, the free map edited by volunteers. If a place is missing or wrong,
+          you can fix it on <a href="https://www.openstreetmap.org">openstreetmap.org</a>.</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Support the app</h2>
+      <p>Ahead is free and has no ads. If you enjoy it, you can support its development with a
+        donation.</p>
+      <p><a class="button" href="https://paypal.me/mclei">Donate with PayPal</a></p>
+    </section>
+
+    <section>
+      <h2>Contact</h2>
+      <p>Questions and bug reports: <a href="mailto:garmin.dev@leisoft.cz">garmin.dev@leisoft.cz</a></p>
+      <p><a href="privacy.html">Privacy policy</a></p>
+    </section>
+
+    <section>
+      <h2>Credits</h2>
+      <p>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>,
+        available under the Open Database License (ODbL). Place search:
+        <a href="https://photon.komoot.io">Photon by komoot</a>.</p>
+    </section>
+  </main>
+
+  <footer>© LEI soft · <a href="mailto:garmin.dev@leisoft.cz">garmin.dev@leisoft.cz</a></footer>
+</body>
+</html>

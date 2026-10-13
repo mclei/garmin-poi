@@ -123,5 +123,5 @@ app (menu → Filters → Map data).
   without the `CIQ_DEVELOPER_KEY` secret, so every release is signed with the same key.
 - Photon's public server is meant for moderate use. If the app gets many users, consider a
   self-hosted Photon instance (`PHOTON_URL` in `source/PoiModel.mc`).
-- Support contact: garmin.dev@leisoft.cz
-- Privacy policy URL (if the store asks for one): […]
+- Support contact: garmin.dev@leisoft.cz, support page https://leisoft.cz/garmin/ahead/
+- Privacy policy URL (if the store asks for one): https://leisoft.cz/garmin/ahead/privacy.html
